@@ -307,6 +307,8 @@ def main():
             HUB_DIMS = ("频道评估", "受众结构", "流量稳定性", "互动真实性", "内容匹配度")
             hub_summary = {k: j[k] for k in HUB_DIMS if j.get(k)}
             hub_summary["合作进度"] = "待联系"
+            if j.get("合理报价区间USD"):
+                hub_summary["Agent建议报价"] = j["合理报价区间USD"]
             if a.by:
                 hub_summary["对接人"] = a.by
             if hub_summary:
@@ -350,6 +352,11 @@ def main():
     path = os.path.join(a.report_dir, f"{safe}.md")
     open(path, "w", encoding="utf-8").write(rpt)
     print(f"报告: {path}")
+
+    # 清理 /tmp 下的中间文件
+    for f in [a.signals, a.judgment, "/tmp/kol_lookup.json"]:
+        if f and os.path.isfile(f) and f.startswith("/tmp"):
+            os.remove(f)
 
 
 def fmt_basis(text):

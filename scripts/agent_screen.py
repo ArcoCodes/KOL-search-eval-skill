@@ -29,6 +29,17 @@ SELF_MONETIZE_PATTERNS = re.compile(
     r"my\s*course|enroll|join\s*my|membership|subscribe\s*for\s*more)\b", re.I)
 
 
+def _corr(xs, ys):
+    n = len(xs)
+    if n < 3:
+        return 0
+    mx, my = sum(xs) / n, sum(ys) / n
+    c = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sx = sum((x - mx) ** 2 for x in xs) ** 0.5
+    sy = sum((y - my) ** 2 for y in ys) ** 0.5
+    return c / (sx * sy) if sx * sy else 0
+
+
 def detect_platform(sig):
     plat_raw = sig.get("platform")
     if plat_raw in PLATFORM_OF:
@@ -92,8 +103,90 @@ def extract_other(sig):
 
 # ── 强否决信号 ──────────────────────────────────────────────────────
 
+def check_engagement_inflation(d):
+    """互动数据异常膨胀 — 赞/评/播比例关系失真，典型买量特征。
+
+    原理：播放和赞可以批量买，真实评论买不动。注水号的赞评播三者
+    比例会"裂开"。从多条视频的点赞率、评论/赞比、跨视频相关性
+    三个角度量化这个裂缝。
+    """
+    videos = d["videos"] or []
+    sources = videos[:15] if videos else d["recent_top"][:15]
+    if not sources:
+        return None
+
+    rows = []
+    for v in sources:
+        views = v.get("view_count") or v.get("views") or v.get("play") or 0
+        likes = v.get("like_count") or v.get("likes") or v.get("digg") or 0
+        comments = v.get("comment_count") or v.get("comments") or 0
+        if views > 0:
+            rows.append({
+                "views": views,
+                "likes": likes,
+                "comments": comments,
+                "like_rate": likes / views,
+                "cmt_rate": comments / views,
+                "cmt_like_ratio": comments / likes if likes > 0 else 0,
+            })
+
+    if len(rows) < 3:
+        return None
+
+    med_like_rate = statistics.median(r["like_rate"] for r in rows)
+    med_cmt_like = statistics.median(r["cmt_like_ratio"] for r in rows)
+    med_cmt_rate = statistics.median(r["cmt_rate"] for r in rows)
+
+    flags = []
+
+    if med_like_rate > 0.08:
+        flags.append(f"中位点赞率 {med_like_rate:.1%}，正常频道 2-4%")
+
+    if med_cmt_like < 0.005 and med_like_rate > 0.03:
+        flags.append(f"评论/赞比仅 {med_cmt_like:.2%}，点赞中几乎无人讨论")
+
+    corr_detail = {}
+    if len(rows) >= 5:
+        likes_list = [r["likes"] for r in rows]
+        comments_list = [r["comments"] for r in rows]
+        views_list = [r["views"] for r in rows]
+        like_rates = [r["like_rate"] for r in rows]
+        cmt_rates = [r["cmt_rate"] for r in rows]
+
+        c_lc = _corr(likes_list, comments_list)
+        c_vlr = _corr(views_list, like_rates)
+        c_vcr = _corr(views_list, cmt_rates)
+
+        corr_detail = {
+            "corr_likes_comments": round(c_lc, 2),
+            "corr_views_like_rate": round(c_vlr, 2),
+            "corr_views_cmt_rate": round(c_vcr, 2),
+        }
+
+        if c_lc < 0.3:
+            flags.append(f"赞评相关性仅 {c_lc:.2f}（健康频道 0.7+），赞和评论脱钩")
+        if c_vlr > 0.4:
+            flags.append(f"播放越高点赞率越高（r={c_vlr:.2f}），疑似热门视频刷赞")
+        if c_vcr < -0.4:
+            flags.append(f"播放越高评论率越低（r={c_vcr:.2f}），高播放视频缺真实讨论")
+
+    result = {
+        "triggered": len(flags) >= 2,
+        "needs_agent": len(flags) == 1,
+        "flags": flags,
+        "median_like_rate": round(med_like_rate, 4),
+        "median_cmt_like_ratio": round(med_cmt_like, 4),
+        "median_cmt_rate": round(med_cmt_rate, 4),
+        "video_count": len(rows),
+        **corr_detail,
+    }
+    if flags:
+        result["hint"] = "；".join(flags)
+    return result
+
+
 def check_single_viral(d):
-    """Top 1 视频占总播放 90%+ → 均播虚高"""
+    """Top 1 视频占总播放 85%+ → 均播虚高"""
     top = d["recent_top"]
     if len(top) < 3:
         return None
@@ -364,6 +457,10 @@ def analyze(sig, business):
         "medium_veto": {},
         "weak": {},
     }
+
+    s = check_engagement_inflation(d)
+    if s:
+        signals["strong_veto"]["互动数据膨胀(疑似买量)"] = s
 
     s = check_single_viral(d)
     if s:

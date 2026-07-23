@@ -53,7 +53,6 @@ handoff entry and does not create a candidate-pool row.
 | `scripts/write_candidate.py` | Candidate-pool writeback after rough screening |
 | `scripts/check_kol_exists.py` | Existing KOL/candidate lookup before detailed evaluation |
 | `scripts/write_kol.py` | Detailed evaluation writeback |
-| `scripts/sync_hub.py` | KOL hub aggregation sync |
 | `scripts/feishu_notify.py` | Optional Feishu IM notification |
 | `references/` | Evaluation rules, methodology, schema notes, tag taxonomy, anti-fraud references |
 | `docs/kol-reports/` | Example KOL reports |

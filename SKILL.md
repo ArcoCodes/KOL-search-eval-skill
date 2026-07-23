@@ -95,14 +95,16 @@ Required JSON:
 ```json
 {
   "候选状态": "待细估",
-  "粗估得分": 85,
+  "粗估得分": 75,
   "评论质量标记": "真实讨论",
   "受众辐射(推断)": "欧美为主",
-  "粗估依据": "85/100 (ER=30 + 粉丝=15 + 活跃=20 + 评论=20); 受众以欧美为主(评论语言85%英语); 内容围绕AI视频生成/图像编辑，与Renoise场景高度相关; 近8条视频均播放1.2万，5万订阅下ER 5.2%属健康区间; 评论有具体产品使用讨论，未见明显灌水; 风险: 更新频率偏低(月均2条)",
+  "粗估依据": "互动数据正常(点赞率3.2%, 赞评比2.1%, 赞评相关0.82); 5.2万粉均播1.2万, 粉播比合理; 受众以欧美为主(评论语言85%英语); 内容围绕AI视频生成/图像编辑，与Renoise场景相关; 评论有具体产品使用讨论，未见明显灌水; 风险: 更新频率偏低(月均2条)",
   "淘汰原因": "",
   "业务线": "Renoise"
 }
 ```
+
+`粗估得分` 是 Agent 的综合判断分（0-100），不是维度分加总。Agent 看完信号后自主评估，重点筛注水/买量号。详见 `references/rough-eval-rules.md`。
 
 ### Step 3 Write Results
 
@@ -118,9 +120,9 @@ write_candidate.py writes: 候选池 only. It does not compute scores or make de
 
 **粗估依据**必须写具体内容，示例:
 ```
-85/100 (ER=30 + 粉丝=15 + 活跃=20 + 评论=20); 受众以欧美为主(评论语言85%英语); 内容围绕AI视频生成/图像编辑，与Renoise场景高度相关; 近8条视频均播放1.2万，5万订阅下ER 5.2%属健康区间; 评论有具体产品使用讨论，未见明显灌水; 风险: 更新频率偏低(月均2条)
+互动数据正常(点赞率3.2%, 赞评比2.1%, 赞评相关0.82); 5.2万粉均播1.2万, 粉播比合理; 受众以欧美为主(评论语言85%英语); 内容围绕AI视频生成/图像编辑，与Renoise场景相关; 评论有具体产品使用讨论，未见明显灌水; 风险: 更新频率偏低(月均2条)
 ```
-**禁止**写"各项指标达标"这种空话。要包含各维度得分拆解、受众语言/地区判断、内容相关性、关键数据及风险点。
+**禁止**写"各项指标达标"这种空话。要包含互动数据是否正常（注水风险判断）、粉播关系、受众判断、内容相关性、关键数据及风险点。
 
 ### 粗估输出
 
@@ -230,11 +232,6 @@ cd ${CLAUDE_SKILL_DIR}/scripts && python3 write_kol.py --signals /tmp/sig.json -
 2. Sends eval report card to that person via Feishu IM (using `feishu_notify.py`)
 3. Success indicator: output contains `判断卡: True ['recvXXX']` + `✅ 消息已发送`
 
-Then aggregate to KOL Hub table:
-```bash
-cd ${CLAUDE_SKILL_DIR}/scripts && python3 sync_hub.py
-```
-
 ### 细估输出
 
 Agent 用自然语言向用户汇报细估结论，不要求固定格式。内容应涵盖：KOL 名称、平台、五维评分、综合判断（建议合作/观望/放弃）、合理报价区间、一句话结论、对接人及飞书记录链接。
@@ -303,14 +300,14 @@ KOL总表 (Hub, one person one row, tblEylVlrP1Qtrmb)
 | 平台明细表 (4张) | 数据仓库 — 原始数据 + Agent补充字段 | write_kol.py |
 | 候选池 | 工作台 — 所有经过粗估的 KOL（通过=待细估，淘汰=已淘汰(浅筛)） | Agent + write_candidate.py |
 | 评估记录 | 判断卡 — 细估5维评分 + 报价 | write_kol.py |
-| KOL总表 | Hub — 一人一行、聚合全局状态 | write_kol.py + sync_hub.py |
+| KOL总表 | Hub — 一人一行、聚合全局状态 | write_kol.py |
 
 **Feishu write pitfalls:**
 - Multi-select fields do NOT auto-create options — fetch existing options → union → write back
 - Dedup key: YouTube = `channel_id`, TikTok = `sec_uid`; always check before writing
 - `综合判断` only accepts `建议合作`/`观望`/`放弃` — wrong value = silent failure
 - `候选状态` 只接受: `待细估`/`已通过`/`已淘汰`/`已完成`
-- `粗估依据` 禁止写空泛内容如"各项指标达标"。格式: `XX/100(ER分+粉丝分+活跃分+评论分); 关键风险: <具体结论>`
+- `粗估依据` 禁止写空泛内容如"各项指标达标"。要包含互动数据判断（点赞率/赞评比/相关性）、粉播关系、关键风险点
 - Link field format: `[{"id":"rec..."}]`
 
 ---
@@ -321,8 +318,8 @@ KOL总表 (Hub, one person one row, tblEylVlrP1Qtrmb)
 |------|------|------|
 | 候选状态 | 单选 | 待细估/已通过/已淘汰/已完成 |
 | 对接人 | 人员 | 谁负责跟进这个 KOL |
-| 粗估得分 | 数字 | Agent 按 rough-eval-rules.md 给出的粗估分 |
-| 粗估依据 | 文本 | 打分明细 + 关键风险标记 |
+| 粗估得分 | 数字 | Agent 综合判断分（0-100），重点判断注水/买量风险 |
+| 粗估依据 | 文本 | 互动数据判断 + 关键风险标记 |
 | 主页URL | URL | 细估默认入口；人发给 agent 的就是这个 |
 | 平台内ID | 文本 | 候选池内去重和兜底定位 |
 | 业务线 | 多选 | Bloome/Renoise/EdgeSpark |

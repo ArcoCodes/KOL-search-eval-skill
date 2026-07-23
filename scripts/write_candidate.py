@@ -230,6 +230,11 @@ def main():
         "score": rough["score"],
     }, ensure_ascii=False, indent=2))
 
+    # 清理 /tmp 下的中间文件
+    for f in [a.signals, a.judgment]:
+        if f and f != "-" and os.path.isfile(f) and f.startswith("/tmp"):
+            os.remove(f)
+
 
 if __name__ == "__main__":
     main()
