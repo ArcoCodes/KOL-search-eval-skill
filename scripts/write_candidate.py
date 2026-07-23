@@ -6,8 +6,8 @@ signals, applies references/rough-eval-rules.md, then passes the resulting
 rough judgment here for Feishu persistence.
 
 Usage:
-    python3 write_candidate.py --signals /tmp/sig.json --judgment /tmp/rough_judgment.json
-    python3 write_candidate.py --signals - --judgment /tmp/rough_judgment.json --source "discovery:AI video" --keyword "AI video"
+    python3 write_candidate.py --from-search --signals /tmp/sig.json --judgment /tmp/rough_judgment.json --source "discovery:AI video" --keyword "AI video"
+    python3 write_candidate.py --from-search --signals - --judgment /tmp/rough_judgment.json --source "discovery:AI video" --keyword "AI video"
 """
 import argparse
 import datetime
@@ -198,12 +198,20 @@ def write_candidate_pool(summary, rough, business, source, keyword, signal_json)
 
 def main():
     ap = argparse.ArgumentParser(description="Agent 粗估结果 → 候选池")
+    ap.add_argument("--from-search", action="store_true", help="确认该 KOL 来自 /kol search 发现结果；只有搜索结果允许写候选池")
     ap.add_argument("--signals", required=True, help="signals JSON path, or '-' for stdin")
     ap.add_argument("--judgment", required=True, help="Agent rough judgment JSON path")
     ap.add_argument("--business", help="业务线 fallback: Bloome/EdgeSpark/Renoise")
     ap.add_argument("--source", default="", help="来源标记, e.g. discovery:AI video")
     ap.add_argument("--keyword", default="", help="命中关键词")
     a = ap.parse_args()
+
+    if not a.from_search or not a.source.startswith("discovery:") or not a.keyword.strip():
+        raise SystemExit(
+            "write_candidate.py 只允许写入 /kol search 发现结果。"
+            " 用户直接提供主页URL时必须走 check_kol_exists.py → 细估，不能写候选池。"
+            " 如确认为搜索结果，请传 --from-search --source 'discovery:<keywords>' --keyword '<keywords>'。"
+        )
 
     sig = load_json(a.signals)
     judgment = load_json(a.judgment)

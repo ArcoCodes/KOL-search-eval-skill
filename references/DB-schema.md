@@ -4,11 +4,11 @@
 >
 > Read on: 2026-07-23
 > Table: 候选池 (`tblfBV6INxVDVl6X`)
-> Note: `@handle` was manually removed from the live table after the initial schema read on 2026-07-23.
+> Note: Account-name fields are not part of the live candidate-pool workflow; homepage URL is the canonical entry.
 
 ## Summary
 
-- Total fields: `22` after removing `@handle`
+- Total fields: `22`
 - Current table role: Step 3 rough-screening workbench + Step 4 human handoff entry
 - Important mismatch with current docs/code:
   - `业务线` only has `Bloome` / `Renoise`; `EdgeSpark` is missing
@@ -207,7 +207,7 @@ If the goal is to keep the pool light but still useful, the recommended minimum 
 
 ## Suggested Next Actions
 
-1. Remove or freeze `@handle`
+1. Keep homepage URL as the only handoff identifier
 1. Add `EdgeSpark` to `业务线`
 2. Add `采集信号JSON`
 3. Add `信号采集时间`

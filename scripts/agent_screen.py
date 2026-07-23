@@ -45,7 +45,7 @@ def extract_youtube(sig):
     sponsor = sig.get("sponsor_intent") or {}
     return {
         "name": ch.get("name"),
-        "handle": sig.get("handle") or ch.get("canonical_handle"),
+        "homepage_url": ch.get("channel_url") or sig.get("homepage_url"),
         "subscribers": ch.get("subscriber_count"),
         "category": ch.get("category"),
         "avg_views": mt.get("avg_views_recent"),
@@ -71,7 +71,7 @@ def extract_other(sig):
     csig = sig.get("comment_signals") or {}
     return {
         "name": ch.get("name"),
-        "handle": ch.get("unique_id"),
+        "homepage_url": ch.get("channel_url"),
         "subscribers": ch.get("followers"),
         "category": ch.get("category"),
         "avg_views": mt.get("avg_play") or mt.get("avg_views") or mt.get("avg_likes"),
@@ -412,7 +412,7 @@ def analyze(sig, business):
     return {
         "kol": {
             "name": d["name"],
-            "handle": d["handle"],
+            "homepage_url": d["homepage_url"],
             "platform": platform,
             "business": business,
             "subscribers": d["subscribers"],
@@ -443,9 +443,8 @@ def main():
     # 摘要报告
     s = result["summary"]
     print("\n" + "=" * 50, file=sys.stderr)
-    h = result['kol']['handle'] or ''
-    h_display = h if h.startswith('@') else f"@{h}"
-    print(f"Agent 粗筛: {result['kol']['name']} ({h_display}) [{result['kol']['platform']}]", file=sys.stderr)
+    homepage_url = result["kol"].get("homepage_url") or ""
+    print(f"Agent 粗筛: {result['kol']['name']} [{result['kol']['platform']}] {homepage_url}", file=sys.stderr)
     if s["auto_triggered_strong"]:
         print(f"⛔ 强否决触发: {', '.join(s['auto_triggered_strong'])}", file=sys.stderr)
     if s["auto_triggered_medium"]:

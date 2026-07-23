@@ -34,11 +34,14 @@ Common entry points:
 
 ```bash
 /kol search "AI video tools"
-/kol @creator_handle
-/kol https://www.youtube.com/@creator_handle
-/kol eval https://www.youtube.com/@creator_handle
+/kol https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxx
+/kol eval https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxx
 /kol check
 ```
+
+Only KOLs discovered through `/kol search ...` go through rough screening and
+candidate-pool writeback. A homepage URL is treated as the detailed-evaluation
+handoff entry and does not create a candidate-pool row.
 
 ## Repository Layout
 

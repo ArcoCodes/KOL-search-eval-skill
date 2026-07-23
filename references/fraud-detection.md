@@ -1,7 +1,7 @@
 # YouTube KOL 刷量鉴定方法(客观指标,可用 yt-dlp 复现)
 
 > 目的:不依赖转化数据、不靠人工读评论,仅用公开的"播放/点赞/评论"三个数,客观判断一个 YouTube 频道是否存在刷量(买播放、买赞、刷评论)。
-> 起因:Shark Numbers(@IvanKv,184 万粉)合作后实际获客仅 200 多,复盘用此方法验证,六项指标全部命中异常。
+> 起因:某 YouTube 频道合作后实际获客仅 200 多,复盘用此方法验证,六项指标全部命中异常。
 
 ---
 
@@ -31,7 +31,7 @@
 抓取命令示例:
 ```bash
 # 1. 取频道视频列表(只要 id,不下载)
-yt-dlp --flat-playlist -J "https://www.youtube.com/@<频道>/videos" > list.json
+yt-dlp --flat-playlist -J "https://www.youtube.com/channel/<channel_id>/videos" > list.json
 
 # 2. 逐条取元数据(取 15~20 条即可,混合热门+近期)
 yt-dlp -J --skip-download "https://www.youtube.com/watch?v=<id>" \

@@ -3,7 +3,7 @@
 产出与 YouTube / TikTok 统一信号脚本平行的信号包，复用同一套 5 维判断。
 ER 口径：IG 无统一 views → 用 (赞+评)/粉丝（IG 行业惯例）。
 链路：search_users(找人) → profile(username→user_id+体量) → user_posts(逐帖赞评) 。
-CLI: instagram.py {search|analyze} <keyword|username>
+CLI: instagram.py {search|analyze} <keyword|instagram_homepage_url>
 """
 import argparse
 import json
@@ -109,11 +109,20 @@ def user_posts(user_id, n=12):
     return out
 
 
-def analyze(handle, n=12):
-    handle = handle.lstrip("@")
-    pf = profile(handle)
+def account_from_url(homepage_url):
+    if not homepage_url.startswith("http"):
+        raise SystemExit("analyze 只支持 Instagram 主页URL。")
+    parts = [p for p in urllib.parse.urlparse(homepage_url).path.split("/") if p]
+    if not parts:
+        raise SystemExit("Instagram 主页URL缺少账号路径。")
+    return parts[0]
+
+
+def analyze(homepage_url, n=12):
+    username = account_from_url(homepage_url)
+    pf = profile(username)
     if not pf:
-        raise SystemExit(f"取不到 Instagram 主页: {handle}")
+        raise SystemExit(f"取不到 Instagram 主页: {homepage_url}")
     posts = user_posts(pf["user_id"], n) if pf.get("user_id") else []
     pv = [p for p in posts if p.get("like") is not None]
     likes = [p["like"] or 0 for p in pv]
@@ -156,6 +165,8 @@ def main():
     ap.add_argument("arg")
     ap.add_argument("--n", type=int, default=12)
     a = ap.parse_args()
+    if a.cmd == "analyze" and not a.arg.startswith("http"):
+        raise SystemExit("analyze 只支持 Instagram 主页URL。")
     if not has_key():
         print("未配置 TIKHUB_API_KEY（IG 无免费层）。", file=sys.stderr); sys.exit(1)
     print(json.dumps(search_users(a.arg) if a.cmd == "search" else analyze(a.arg, a.n), ensure_ascii=False, indent=2))

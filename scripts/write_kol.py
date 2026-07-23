@@ -18,7 +18,7 @@ judgment JSON schema:
  "频道评估":"...", "受众结构":"...", "流量稳定性":"...", "互动真实性":"...", "内容匹配度":"..."
 }
 """
-import argparse, json, subprocess, datetime, os, re
+import argparse, json, subprocess, datetime, os, re, sys
 
 BT = "WEcDbjFnKa48YbsKa8qc8auQnlc"
 MAIN = "tblzR7h4fH1y1Hkf"          # YouTube KOL 明细表（原 KOL频道库）
@@ -80,7 +80,7 @@ def ensure_options(table, field, values):
 
 def normalize_signals(sig):
     """把不同平台的信号归一成统一的 ch/mt（沿用 YouTube 字段名，下游不用改）。
-    返回 (ch, mt, platform, handle)。channel_id 统一存"平台内ID"（YT=channel_id / TikTok=sec_uid）。"""
+    返回 (ch, mt, platform, homepage_url)。channel_id 统一存"平台内ID"（YT=channel_id / TikTok=sec_uid）。"""
     plat = sig.get("platform")
     if plat in ("tiktok", "instagram", "twitter"):
         c, m = sig["channel"], sig["metrics"]
@@ -91,7 +91,7 @@ def normalize_signals(sig):
             "subscriber_count": c.get("followers"),
             "total_videos": c.get("video_count") or c.get("post_count"),
             "creator_country": c.get("region") or c.get("location"),
-            "canonical_handle": c.get("unique_id"), "total_likes": c.get("total_likes"),
+            "total_likes": c.get("total_likes"),
             "tier": tier_label(c.get("followers")), "shorts_count": None, "category": c.get("category"),
             "subtitle_summary": None, "email": None, "raw_tags_top": [], "latest_upload": None,
         }
@@ -104,10 +104,10 @@ def normalize_signals(sig):
             "median_views_recent": m.get("median_play"),
             "view_sub_ratio": m.get("play_follower_ratio"), "upload_interval_days_avg": None,
         }
-        return ch, mt, PLATFORM_OF[plat], c.get("unique_id") or ""
+        return ch, mt, PLATFORM_OF[plat], c.get("channel_url") or ""
     # YouTube / youtube_data.py 嵌套结构
     ch, mt = sig["metrics"]["channel"], sig["metrics"]["metrics"]
-    return ch, mt, "YouTube", (sig.get("handle") or ch.get("canonical_handle") or "")
+    return ch, mt, "YouTube", ch.get("channel_url") or ""
 
 
 def tier_label(subs):
@@ -193,14 +193,14 @@ def hub_add_platform(hub_rid, platform):
 
 
 def build_patch(sig, j, platform, today):
-    """平台路由：返回 (table, patch, id_field, id_value, name, handle)。"""
+    """平台路由：返回 (table, patch, id_field, id_value, name, homepage_url)。"""
     if platform == "TikTok":
         c, m = sig["channel"], sig["metrics"]
         pid = c.get("sec_uid") or c.get("unique_id")
         cs = sig.get("comment_signals") or {}
         ld = cs.get("language_dist")
         patch = {
-            "账号名称": c.get("name"), "@handle": c.get("unique_id"), "sec_uid": pid,
+            "账号名称": c.get("name"), "sec_uid": pid,
             "主页URL": c.get("channel_url"), "头像URL": c.get("avatar"),
             "粉丝数": c.get("followers"), "总赞": c.get("total_likes"), "视频数": c.get("video_count"),
             "加权ER": m.get("engagement_rate_weighted"), "赞率": m.get("like_rate_weighted"),
@@ -212,12 +212,12 @@ def build_patch(sig, j, platform, today):
             "购买意图数": cs.get("purchase_intent_count"), "评论质量标记": j.get("评论质量标记"),
             "来源": j.get("来源", "kol-eval自动"), "抓取时间": today + " 00:00:00", "备注": j.get("备注", ""),
         }
-        return TT, patch, "sec_uid", pid, c.get("name"), c.get("unique_id") or ""
+        return TT, patch, "sec_uid", pid, c.get("name"), c.get("channel_url") or ""
     if platform == "Instagram":
         c, m = sig["channel"], sig["metrics"]
         pid = c.get("user_id")
         patch = {
-            "账号名称": c.get("name"), "@handle": c.get("unique_id"), "用户ID": pid,
+            "账号名称": c.get("name"), "用户ID": pid,
             "主页URL": c.get("channel_url"), "头像URL": c.get("avatar"),
             "粉丝数": c.get("followers"), "关注数": c.get("following"), "帖子数": c.get("post_count"),
             "互动率": m.get("engagement_rate_weighted"), "近期均赞": m.get("avg_likes"), "近期均评": m.get("avg_comments"),
@@ -226,12 +226,12 @@ def build_patch(sig, j, platform, today):
             "内容题材": j.get("内容题材"), "提及工具": j.get("提及工具"), "评论质量标记": j.get("评论质量标记"),
             "来源": j.get("来源", "kol-eval自动"), "抓取时间": today + " 00:00:00", "备注": j.get("备注", ""),
         }
-        return IG, patch, "用户ID", pid, c.get("name"), c.get("unique_id") or ""
+        return IG, patch, "用户ID", pid, c.get("name"), c.get("channel_url") or ""
     if platform == "Twitter":
         c, m = sig["channel"], sig["metrics"]
         pid = c.get("rest_id")
         patch = {
-            "账号名称": c.get("name"), "@handle": c.get("unique_id"), "rest_id": pid,
+            "账号名称": c.get("name"), "rest_id": pid,
             "主页URL": c.get("channel_url"), "头像URL": c.get("avatar"),
             "粉丝数": c.get("followers"), "关注数": c.get("following"),
             "加权ER": m.get("engagement_rate_weighted"), "点赞率": m.get("like_rate_weighted"),
@@ -242,10 +242,9 @@ def build_patch(sig, j, platform, today):
             "内容题材": j.get("内容题材"), "提及工具": j.get("提及工具"), "评论质量标记": j.get("评论质量标记"),
             "来源": j.get("来源", "kol-eval自动"), "抓取时间": today + " 00:00:00", "备注": j.get("备注", ""),
         }
-        return TW, patch, "rest_id", pid, c.get("name"), c.get("unique_id") or ""
+        return TW, patch, "rest_id", pid, c.get("name"), c.get("channel_url") or ""
     # YouTube
     ch, mt = sig["metrics"]["channel"], sig["metrics"]["metrics"]
-    handle = sig.get("handle") or ch.get("canonical_handle") or ""
     patch = {
         "账号名称": ch.get("name"), "主页URL": ch.get("channel_url"),
         "邮箱": ch.get("email"),
@@ -261,7 +260,7 @@ def build_patch(sig, j, platform, today):
         "来源": j.get("来源", "kol-eval自动"),
         "抓取时间": today + " 00:00:00", "备注": j.get("备注", ""),
     }
-    return MAIN, patch, "主页URL", ch.get("channel_url"), ch.get("name"), handle
+    return MAIN, patch, "主页URL", ch.get("channel_url"), ch.get("name"), ch.get("channel_url") or ""
 
 
 def main():
@@ -276,12 +275,12 @@ def main():
     sig = json.load(open(a.signals, encoding="utf-8"))
     j = json.load(open(a.judgment, encoding="utf-8"))
     platform = PLATFORM_OF.get(sig.get("platform"), "YouTube")
-    ch, mt, _p, handle = normalize_signals(sig)   # 供报告统一渲染
+    ch, mt, _p, homepage_url = normalize_signals(sig)   # 供报告统一渲染
     today = datetime.date.today().strftime("%Y-%m-%d")
 
     if not a.no_write:
         validate_enums(j)
-        table, patch, idf, idv, name, handle = build_patch(sig, j, platform, today)
+        table, patch, idf, idv, name, homepage_url = build_patch(sig, j, platform, today)
         ensure_options(table, "内容题材", j.get("内容题材"))
         ensure_options(table, "提及工具", j.get("提及工具"))
         existing_rid, existing_f = find_in_table(table, idf, idv)
@@ -325,19 +324,6 @@ def main():
                    "--json", json.dumps({"fields": ef, "rows": [er]}, ensure_ascii=False)])
         print(f"判断卡: {r2.get('ok')} {(r2.get('data') or {}).get('record_id_list')}")
 
-        # 更新候选池状态
-        id_field_map = {"YouTube": "channel_id", "TikTok": "sec_uid", "Instagram": "用户ID", "Twitter": "rest_id"}
-        plat_id = patch.get(id_field_map.get(platform, "channel_id"))
-        if plat_id:
-            pool_status = "已通过" if j.get("综合判断") == "建议合作" else "已淘汰"
-            for pool_rid, pf in list_table(POOL):
-                if pf.get("平台内ID") == plat_id:
-                    lark(["+record-batch-update", "--base-token", BT, "--table-id", POOL,
-                          "--json", json.dumps({"record_id_list": [pool_rid],
-                                                "patch": {"候选状态": pool_status}}, ensure_ascii=False)])
-                    print(f"候选池状态更新: {pool_rid} → {pool_status}")
-                    break
-
     # 飞书通知对接人
     if not a.no_write and a.by:
         try:
@@ -347,7 +333,7 @@ def main():
             sc = j.get("scores", {})
             card = fn.build_eval_card(
                 title=f"KOL 细估完成: {name}",
-                kol_name=name, handle=handle, platform=platform,
+                kol_name=name, homepage_url=homepage_url, platform=platform,
                 business=j.get("业务线", ""),
                 scores=sc, verdict=j.get("综合判断", ""),
                 price_range=j.get("合理报价区间USD", ""),
@@ -358,9 +344,9 @@ def main():
             print(f"⚠️ 飞书通知失败: {e}", file=sys.stderr)
 
     # 报告
-    rpt = render_report(sig, j, ch, mt, handle, today)
+    rpt = render_report(sig, j, ch, mt, homepage_url, today)
     os.makedirs(a.report_dir, exist_ok=True)
-    safe = re.sub(r"[^\w]", "_", handle.lstrip("@")) or ch.get("channel_id")
+    safe = re.sub(r"[^\w]", "_", ch.get("channel_id") or homepage_url)[:80] or "kol_report"
     path = os.path.join(a.report_dir, f"{safe}.md")
     open(path, "w", encoding="utf-8").write(rpt)
     print(f"报告: {path}")
@@ -387,7 +373,7 @@ def _c(x):
     return f"{x:,}" if isinstance(x, int) else (x if x is not None else "?")
 
 
-def render_report(sig, j, ch, mt, handle, today):
+def render_report(sig, j, ch, mt, homepage_url, today):
     sc = j.get("scores", {})
     platform = {"tiktok": "TikTok", "instagram": "Instagram", "twitter": "Twitter"}.get(sig.get("platform"), "YouTube")
     # 近期Top：兼容 YouTube(title/views) / TikTok(desc/play) / IG(desc/like) / Twitter(text/views)
@@ -398,9 +384,10 @@ def render_report(sig, j, ch, mt, handle, today):
     cmt = (sig.get("comments") or {}).get("signals", {})       # YouTube
     csig = sig.get("comment_signals", {})                       # TikTok/IG/Twitter
     L = []
-    L.append(f"# KOL 评估报告 · {handle}（{ch.get('name')}）[{platform}]\n")
+    L.append(f"# KOL 评估报告 · {ch.get('name')} [{platform}]\n")
     src = "yt-dlp+/about" if platform == "YouTube" else "TikHub"
     L.append(f"> 评估日期：{today} ｜ 工具：`skills/kol-eval` ｜ 平台：{platform} ｜ 数据来源：{src}")
+    L.append(f"> 主页URL：{homepage_url}")
     L.append(f"> 状态：**{j.get('状态','未合作')}**\n\n---\n")
     L.append(f"## 🚦 结论：{j.get('综合判断')}\n")
     L.append(f"**一句话**：{j.get('一句话', j.get('判断依据','')[:80])}\n")

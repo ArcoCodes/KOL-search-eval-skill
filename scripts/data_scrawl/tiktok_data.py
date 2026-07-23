@@ -5,7 +5,7 @@
 链路：search_users(找人) → profile(uniqueId→secUid+体量) → user_posts(secUid→逐作品stats) → comments(反作弊+购买意图+语言)。
 计数 TikTok API 多为 int，直接用。
 
-CLI: tiktok.py {search|analyze} <keyword|@handle>
+CLI: tiktok.py {search|analyze} <keyword|tiktok_homepage_url>
 """
 import argparse
 import json
@@ -123,11 +123,20 @@ def comments(aweme_id, n=30):
     return out
 
 
-def analyze(handle, n=12, comment_video=True):
-    handle = handle.lstrip("@")
-    pf = profile(handle)
+def account_from_url(homepage_url):
+    if not homepage_url.startswith("http"):
+        raise SystemExit("analyze 只支持 TikTok 主页URL。")
+    parts = [p for p in urllib.parse.urlparse(homepage_url).path.split("/") if p]
+    if not parts:
+        raise SystemExit("TikTok 主页URL缺少账号路径。")
+    return parts[0].lstrip("@")
+
+
+def analyze(homepage_url, n=12, comment_video=True):
+    username = account_from_url(homepage_url)
+    pf = profile(username)
     if not pf:
-        raise SystemExit(f"取不到 TikTok 主页: {handle}")
+        raise SystemExit(f"取不到 TikTok 主页: {homepage_url}")
     posts = user_posts(pf["sec_uid"], n) if pf.get("sec_uid") else []
 
     pv = [p for p in posts if p.get("play")]
@@ -140,7 +149,7 @@ def analyze(handle, n=12, comment_video=True):
     recent_top = sorted(
         [{"desc": p["desc"][:60], "play": p["play"], "digg": p.get("digg"),
           "comment": p.get("comment"), "share": p.get("share"),
-          "url": f"https://www.tiktok.com/@{handle}/video/{p['id']}"} for p in pv],
+          "url": f"https://www.tiktok.com/@{username}/video/{p['id']}"} for p in pv],
         key=lambda x: x["play"], reverse=True)[:8]
 
     # 评论信号（取播放最高的一条视频抽样）
@@ -200,6 +209,8 @@ def main():
     ap.add_argument("arg")
     ap.add_argument("--n", type=int, default=12)
     a = ap.parse_args()
+    if a.cmd == "analyze" and not a.arg.startswith("http"):
+        raise SystemExit("analyze 只支持 TikTok 主页URL。")
     if not has_key():
         print("未配置 TIKHUB_API_KEY（TikTok 无免费层，全走 TikHub）。", file=sys.stderr); sys.exit(1)
     if a.cmd == "search":

@@ -3,7 +3,7 @@
 产出与其它平台平行的信号包，复用同一套 5 维判断。
 ER 口径：(赞+转+回+引)/views —— Twitter 逐推有 views，用 views 口径（最准）。
 链路：search(找人) → profile(screen_name→体量) → user_post_tweet(逐推 stats)。
-CLI: twitter.py {search|analyze} <keyword|screen_name>
+CLI: twitter.py {search|analyze} <keyword|twitter_homepage_url>
 """
 import argparse
 import json
@@ -123,12 +123,21 @@ def tweets(screen_name, n=20):
     return out
 
 
-def analyze(handle, n=20):
-    handle = handle.lstrip("@")
-    pf = profile(handle)
+def account_from_url(homepage_url):
+    if not homepage_url.startswith("http"):
+        raise SystemExit("analyze 只支持 Twitter/X 主页URL。")
+    parts = [p for p in urllib.parse.urlparse(homepage_url).path.split("/") if p]
+    if not parts:
+        raise SystemExit("Twitter/X 主页URL缺少账号路径。")
+    return parts[0]
+
+
+def analyze(homepage_url, n=20):
+    screen_name = account_from_url(homepage_url)
+    pf = profile(screen_name)
     if not pf:
-        raise SystemExit(f"取不到 Twitter 主页: {handle}")
-    tw = tweets(handle, n)
+        raise SystemExit(f"取不到 Twitter 主页: {homepage_url}")
+    tw = tweets(screen_name, n)
     tv = [t for t in tw if t.get("views")]
     views = [t["views"] for t in tv]
     tV = sum(views)
@@ -139,7 +148,7 @@ def analyze(handle, n=20):
     tB = sum(t.get("bookmarks") or 0 for t in tv)
     recent_top = sorted(
         [{"text": t["text"][:60], "views": t["views"], "fav": t.get("fav"), "rt": t.get("rt"),
-          "url": f"https://x.com/{handle}/status/{t['tweet_id']}" if t.get("tweet_id") else None} for t in tv],
+          "url": f"https://x.com/{screen_name}/status/{t['tweet_id']}" if t.get("tweet_id") else None} for t in tv],
         key=lambda x: x["views"], reverse=True)[:8]
     langs = {}
     for t in tw:
@@ -179,6 +188,8 @@ def main():
     ap.add_argument("arg")
     ap.add_argument("--n", type=int, default=20)
     a = ap.parse_args()
+    if a.cmd == "analyze" and not a.arg.startswith("http"):
+        raise SystemExit("analyze 只支持 Twitter/X 主页URL。")
     if not has_key():
         print("未配置 TIKHUB_API_KEY（Twitter 无免费层）。", file=sys.stderr); sys.exit(1)
     print(json.dumps(search_users(a.arg) if a.cmd == "search" else analyze(a.arg, a.n), ensure_ascii=False, indent=2))

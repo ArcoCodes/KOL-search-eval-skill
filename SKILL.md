@@ -23,13 +23,13 @@ Step 3: Agent 按 references/rough-eval-rules.md 执行粗估
   ↓ write_candidate.py 把KOL信息写入候选池，附具体粗估依据
   ⏸ 等待对接人接手
   ↓
-Step 4: 人在候选池找到该 KOL，填写"对接人"=自己，或自行寻找优质的KOL。
+Step 4: 人给出 KOL 主页URL（来自候选池或自行发现都可以）。
   ↓ 把博主的主页URL发给自己的 agent
 Step 4a: Agent 先在KOL总表和候选池里根据主页URL查看是否已经存在于系统中（check_kol_exists.py）
   ↓ 若 KOL总表已存在，则提醒用户已存在
-  ↓ 若候选池已存在，则优先读取候选池中的信号快照；没有快照则重采
-  ↓ 如果并不存在于系统，则先重新采集信号
-Step 4b: 读取采集信号
+  ↓ 若候选池已存在，则把候选状态改成"已通过"，带候选池全量行信息进入细估；有信号快照则复用，没有则重采
+  ↓ 若 KOL总表和候选池都不存在，则采集信号后直接进入细估，不写候选池
+Step 4b: 读取采集信号 + 候选池元信息（如果存在）
 Step 4c: Agent 按照 references/detailed-eval-rules.md 对KOL进行细估 (write_kol.py --by 对接人email/open_id)
   ↓ 写入 KOL总表(合作进度=待联系, 对接人) + 评估记录
 Step 4d: 如传 --by，则飞书 IM 通知对接人 (feishu_notify.py)
@@ -43,9 +43,9 @@ Parse the skill args to determine the entry point:
 2. `eval` → detailed evaluation for candidates (accepts candidate-pool URL; see Detailed Eval section)
 3. `check update` / `update` / `更新 skill` → read `references/update.md` and follow the explicit update protocol
 4. `check` → environment check (see Check section)
-5. URL or `@handle` → signal collection + Agent rough screening (see Screen section)
-   - Exception: if the user explicitly says this URL/handle comes from 候选池 or asks for "细估", route to Detailed Eval instead of rough screening.
-6. Otherwise → show usage help
+5. Homepage URL → Detailed Eval by default. Always run `check_kol_exists.py` first; do not rough-screen or write the candidate pool.
+6. Non-URL account identifiers are unsupported. Ask the user for the KOL homepage URL.
+7. Otherwise → show usage help
 
 ## Platform Detection
 
@@ -60,9 +60,13 @@ Parse the skill args to determine the entry point:
 
 ---
 
-## Screen Pipeline (`/kol <URL>`)
+## Rough Screening Pipeline (search results only)
 
 **Step 2 + Step 3 combined: signal collection → Agent rough judgment → write candidate pool.**
+
+Use this pipeline only for KOLs discovered through `/kol search ...`.
+
+Do not use this pipeline for a homepage URL directly sent by the user. Direct homepage URLs are Step 4 detailed-eval entry points.
 
 ### Step 2: Fetch Signals (automated)
 
@@ -70,17 +74,17 @@ Run the platform-specific script:
 
 **YouTube:**
 ```bash
-cd ${CLAUDE_SKILL_DIR}/scripts && python3 data_scrawl/youtube_data.py @handle --n 8 --comment-videos 4
+cd ${CLAUDE_SKILL_DIR}/scripts && python3 data_scrawl/youtube_data.py "<youtube_homepage_url>" --n 8 --comment-videos 4
 ```
 
-**Instagram / TikTok / Twitter:** same pattern with `instagram.py` / `tiktok.py` / `twitter.py`.
+**Instagram / TikTok / Twitter:** same pattern with `data_scrawl/instagram_data.py` / `data_scrawl/tiktok_data.py` / `data_scrawl/twitter_data.py`.
 
 Script output → stdout JSON.
 Four-platform field inventory is documented in `references/platform-signal-collection.csv`.
 
 **注意 stdout/stderr 分流**: youtube_data.py 的 JSON 输出在 stdout，日志在 stderr。把 stdout 保存为信号文件，不要把 stderr 混入 JSON。推荐做法:
 ```bash
-python3 data_scrawl/youtube_data.py @handle --n 8 --comment-videos 4 > /tmp/sig.json
+python3 data_scrawl/youtube_data.py "<homepage_url>" --n 8 --comment-videos 4 > /tmp/sig.json
 ```
 
 ### Step 3: Agent Rough Judgment
@@ -102,13 +106,15 @@ Required JSON:
 
 ### Step 3 Write Results
 
-**不管通过还是淘汰，所有候选 KOL 都必须写入候选池。** Agent 判断通过→`待细估`，淘汰→`已淘汰(浅筛)`。
+**不管通过还是淘汰，所有从 search 结果进入粗估的 KOL 都必须写入候选池。** Agent 判断通过→`待细估`，淘汰→`已淘汰(浅筛)`。
 
 **写入候选池：**
 ```bash
-cd ${CLAUDE_SKILL_DIR}/scripts && python3 write_candidate.py --signals /tmp/sig.json --judgment /tmp/rough_judgment.json --source "discovery:xxx" --keyword "xxx"
+cd ${CLAUDE_SKILL_DIR}/scripts && python3 write_candidate.py --from-search --signals /tmp/sig.json --judgment /tmp/rough_judgment.json --source "discovery:xxx" --keyword "xxx"
 ```
 write_candidate.py writes: 候选池 only. It does not compute scores or make decisions.
+
+`write_candidate.py` has a hard guard: it only accepts search-discovered KOLs with `--from-search --source "discovery:<keywords>" --keyword "<keywords>"`. If the user directly provided a homepage URL, do not call this script.
 
 **粗估依据**必须写具体内容（Agent 手写硬分明细 + 关键判断）。格式:
 ```
@@ -120,7 +126,7 @@ write_candidate.py writes: 候选池 only. It does not compute scores or make de
 
 ```
 ==================================================
-粗估: Channel Name (@handle) [YouTube]
+粗估: Channel Name [YouTube]
 粉丝: 50,000 | ER: 5.20% | 均播放: 12,000
 评论质量: 真实讨论 | 受众辐射: 欧美为主 | 国家: US
 硬分: {'ER': 30, '粉丝': 15, '活跃': 20, '评论': 30} = 95/100
@@ -135,24 +141,25 @@ write_candidate.py writes: 候选池 only. It does not compute scores or make de
 **Step 4: Agent根据KOL链接及已采集的信号进行细估.**
 
 ### When to use
+- Whenever the user provides a KOL homepage URL
 - After a KOL passes rough screening and enters 候选池 (status=待细估)
 - 对接人在候选池里把该 KOL 分给自己后，把主页URL 发给自己的 agent
-- Manual eval is still allowed, but candidate-pool handoff is the default flow
+- Manual eval for a new homepage URL is allowed and should skip the candidate pool
 
-### Trigger flow (Agent handoff from 候选池)
+### Trigger flow (homepage URL handoff)
 
 新的默认流程：
-1. 人在候选池定位目标 KOL，确认 `候选状态=待细估`
-2. 把 `对接人` 设成自己
-3. 把该行的 `主页URL` 发给自己的 agent，并明确说"做细估并写入 KOL 总表"
-4. Agent 先运行 `check_kol_exists.py <主页URL>`，然后再决定是否重采信号
-5. 若返回 `exists_in_system`，提醒用户该 KOL 已存在于正式系统
-6. 若返回 `candidate_snapshot` / `candidate_refetch` / `refetched`，继续细估
-7. Agent 读取：
+1. 用户给出 KOL 主页URL
+2. Agent 先运行 `check_kol_exists.py <主页URL>`，同时查 KOL总表/平台明细和候选池
+3. 若返回 `exists_in_system`，提醒用户该 KOL 已存在于正式系统，不继续细估
+4. 若返回 `candidate_snapshot` / `candidate_refetch`：候选池已命中，脚本已把 `候选状态` 更新为 `已通过`；继续细估
+5. 若返回 `refetched`：KOL总表和候选池都不存在，脚本已采集信号；继续细估，细估完成后只写 KOL总表/平台明细/评估记录，不写候选池
+6. Agent 读取：
    - `业务线`
    - `对接人`
    - `主页URL`
-8. Agent 运行 `/kol eval <URL> --by <对接人email/open_id>`
+   - 候选池命中时的全部候选池字段（`candidate_pool.fields`）
+7. Agent 运行 `/kol eval <URL> --by <对接人email/open_id>`
 
 `对接人` 字段值用于：① 写入 KOL 总表的 `对接人` ② 细估完发飞书 IM 通知（如果传了 `--by`）。
 
@@ -160,15 +167,16 @@ write_candidate.py writes: 候选池 only. It does not compute scores or make de
 
 优先运行：
 ```bash
-cd ${CLAUDE_SKILL_DIR}/scripts && python3 check_kol_exists.py "<homepage_url>" --out /tmp/sig.json
+cd ${CLAUDE_SKILL_DIR}/scripts && python3 check_kol_exists.py "<homepage_url>" --out /tmp/sig.json --meta-out /tmp/kol_lookup.json
 ```
 
 规则：
 - `exists_in_system` → 提醒用户该 KOL 已在正式系统里，不继续细估
-- `candidate_snapshot` → 直接复用候选池中的信号快照
-- `candidate_refetch` / `refetched` → 重新采信号，并写到 `--out`
+- `candidate_snapshot` → 候选池命中，候选状态已改为 `已通过`；直接复用候选池中的信号快照，并读取 `/tmp/kol_lookup.json` 的 `candidate_pool.fields`
+- `candidate_refetch` → 候选池命中，候选状态已改为 `已通过`；读取 `/tmp/kol_lookup.json` 的 `candidate_pool.fields`，重新采信号，并写到 `--out`
+- `refetched` → KOL总表和候选池都不存在；重新采信号并进入细估，细估后写入 KOL总表/平台明细/评估记录，不调用 `write_candidate.py`
 
-If the user provided a 候选池 homepage URL, treat it as a detailed-eval entry point, not a rough-screening entry point.
+If the user provided any homepage URL, treat it as a detailed-eval entry point, not a rough-screening entry point.
 
 ### Step 4b: Agent Comprehensive Judgment (you do this)
 
@@ -216,7 +224,8 @@ cd ${CLAUDE_SKILL_DIR}/scripts && python3 sync_hub.py
 
 ```
 === KOL Evaluation Complete ===
-KOL: <name> (@handle)
+KOL: <name>
+Homepage URL: <homepage_url>
 Platform: <platform>
 Audience: <受众欧美辐射>
 Scores: 受众匹配 X / 内容承载 X / 流量稳定 X / 互动可信 X / 报价合理 X
@@ -254,7 +263,7 @@ cd ${CLAUDE_SKILL_DIR}/scripts && python3 yt_search.py "<keywords>" --limit 50 -
 
 With `--collect-signals`, the script runs `data_scrawl/youtube_data.py` on each new channel and saves signal JSON files under `/tmp/kol_search_signals_*`. `--auto-eval` is kept only as a deprecated alias and no longer writes to 候选池.
 
-**After search, for each new channel with signals, run the same screening as the Screen Pipeline:**
+**After search, for each new channel with signals, run the Rough Screening Pipeline:**
 1. Read the saved signal JSON
 2. Agent applies `references/rough-eval-rules.md`
 3. Agent writes `/tmp/rough_judgment.json`
@@ -262,10 +271,10 @@ With `--collect-signals`, the script runs `data_scrawl/youtube_data.py` on each 
 
 ```bash
 # Step 3: Agent 生成 /tmp/rough_judgment.json 后写入候选池
-cd ${CLAUDE_SKILL_DIR}/scripts && python3 write_candidate.py --signals /tmp/sig.json --judgment /tmp/rough_judgment.json --source "discovery:<keywords>" --keyword "<keywords>"
+cd ${CLAUDE_SKILL_DIR}/scripts && python3 write_candidate.py --from-search --signals /tmp/sig.json --judgment /tmp/rough_judgment.json --source "discovery:<keywords>" --keyword "<keywords>"
 ```
 
-For batch search with many channels, Agent may triage the saved signal files one by one. But **all channels selected for rough screening must end up in 候选池** with a clear status and basis.
+For batch search with many channels, Agent may triage the saved signal files one by one. But **all search-discovered channels selected for rough screening must end up in 候选池** with a clear status and basis.
 
 **Dedup logic:** Channels are deduplicated by `channel_id` against the Feishu YouTube KOL明细表. A channel already in the table is marked "existing" and skipped.
 
@@ -321,16 +330,15 @@ KOL总表 (Hub, one person one row, tblEylVlrP1Qtrmb)
 
 ### 人的操作
 
-1. 在候选池找到目标 KOL
-2. 把 `对接人` 设成自己
-3. 把该行 `主页URL` 发给自己的 agent
-4. 告诉 agent 这是候选池里的 KOL，需要继续细估并写入 KOL 总表
+1. 如果目标 KOL 来自候选池，把 `对接人` 设成自己
+2. 把该行 `主页URL` 发给自己的 agent
+3. 不需要额外说明它来自候选池；agent 会先查候选池和 KOL 总表
 
 ### Agent 的操作
 
-1. 把这个 URL 视为 Step 4 入口，而不是 Step 2+3 的粗估入口
+1. 把所有主页 URL 视为 Step 4 入口，而不是 Step 2+3 的粗估入口
 2. 先运行 `check_kol_exists.py` 做系统查重和信号准备
-3. 再回候选池读该记录，拿到 `业务线` 和 `对接人`
+3. 如果候选池命中，脚本已把该记录 `候选状态` 改成 `已通过`；读取 `/tmp/kol_lookup.json` 里的完整候选池字段，拿到 `业务线` 和 `对接人`
 4. 读取 `sig.json`（候选池快照或重新采集）
 5. 产出 `/tmp/judge.json`
 6. 执行 `write_kol.py --by <对接人email/open_id>`，把结果写入平台明细 / 评估记录 / KOL 总表

@@ -93,12 +93,12 @@ def send_message(token, receive_id, receive_id_type, msg_type, content):
         return False
 
 
-def build_eval_card(title, kol_name, handle, platform, business,
+def build_eval_card(title, kol_name, homepage_url, platform, business,
                     scores, verdict, price_range, conclusion, report_url=None):
     """构建细估报告消息卡片。"""
     score_text = " | ".join(f"{k} **{v}**" for k, v in scores.items())
     elements = [
-        {"tag": "div", "text": {"tag": "lark_md", "content": f"**KOL**: {kol_name} ({handle})\n**平台**: {platform} | **业务线**: {business}"}},
+        {"tag": "div", "text": {"tag": "lark_md", "content": f"**KOL**: {kol_name}\n**主页URL**: {homepage_url}\n**平台**: {platform} | **业务线**: {business}"}},
         {"tag": "div", "text": {"tag": "lark_md", "content": f"**评分**: {score_text}"}},
         {"tag": "div", "text": {"tag": "lark_md", "content": f"**判断**: {verdict}\n**报价**: {price_range}"}},
         {"tag": "hr"},

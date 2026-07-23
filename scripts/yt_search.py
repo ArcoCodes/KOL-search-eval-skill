@@ -286,10 +286,10 @@ def main():
             print("  ! --auto-eval 已废弃：粗估改由 Agent 按 references/rough-eval-rules.md 执行，本次仅采集信号。", flush=True)
         for i, ch in enumerate(new_channels, 1):
             cid = ch["channel_id"]
-            handle = f"https://www.youtube.com/channel/{cid}"
+            channel_url = f"https://www.youtube.com/channel/{cid}"
             print(f"\n[{i}/{len(new_channels)}] 采集 {ch['author']} ...", file=sys.stderr, flush=True)
             r = subprocess.run(
-                ["python3", os.path.join(script_dir, "data_scrawl", "youtube_data.py"), handle,
+                ["python3", os.path.join(script_dir, "data_scrawl", "youtube_data.py"), channel_url,
                  "--n", str(a.eval_n), "--comment-videos", str(a.eval_comment_videos)],
                 capture_output=True, text=True, timeout=300,
             )

@@ -4,9 +4,10 @@
 
 ## 触发
 
-- `/kol @handle` 或 URL → Step 2 + Step 3（信号采集 + Agent 粗估）
+- `/kol <主页URL>` → Step 4（先查 KOL总表/候选池，再直接细估）
 - `/kol search <keywords>` → Step 1 + Step 2 + Step 3（搜索 + 批量粗估）
-- `/kol eval <URL or @handle>` → Step 4（细估，需 Agent 判断）
+- `/kol eval <主页URL>` → Step 4（细估，需 Agent 判断；不写候选池）
+- 非 URL 账号标识不支持；要求用户提供 KOL 主页URL
 
 ## 流程总览
 
@@ -50,14 +51,16 @@ python3 yt_search.py "<keywords>" --limit 50
 
 | 平台 | 命令 |
 |------|------|
-| YouTube | `python3 data_scrawl/youtube_data.py @handle --n 8 --comment-videos 4` |
-| Instagram | `python3 instagram.py analyze <handle>` |
-| TikTok | `python3 tiktok.py analyze <handle>` |
-| Twitter/X | `python3 twitter.py analyze <handle>` |
+| YouTube | `python3 data_scrawl/youtube_data.py "<youtube_homepage_url>" --n 8 --comment-videos 4` |
+| Instagram | `python3 data_scrawl/instagram_data.py analyze "<instagram_homepage_url>"` |
+| TikTok | `python3 data_scrawl/tiktok_data.py analyze "<tiktok_homepage_url>"` |
+| Twitter/X | `python3 data_scrawl/twitter_data.py analyze "<twitter_homepage_url>"` |
 
 **数据源**：yt-dlp（免费优先）→ TikHub（限流兜底）
 
 **产出**：stdout JSON（推荐保存为 `/tmp/sig.json`）；如进入细估入口，也可由 `check_kol_exists.py --out /tmp/sig.json` 生成临时文件
+
+**边界**：Step 2 只作为 search 后批量粗估或 Step 4 细估的数据准备；用户必须提供主页URL。
 
 **不涉及任何飞书写入**
 
@@ -65,16 +68,20 @@ python3 yt_search.py "<keywords>" --limit 50
 
 ## Step 3：粗估（Agent + `write_candidate.py`）
 
+**只用于 `/kol search ...` 找到的 KOL。** 用户直接给主页URL时，不走 Step 3，不调用 `write_candidate.py`。
+
 **执行**：
 ```bash
-python3 data_scrawl/youtube_data.py @handle --n 8 --comment-videos 4 > /tmp/sig.json
+python3 data_scrawl/youtube_data.py "<homepage_url>" --n 8 --comment-videos 4 > /tmp/sig.json
 ```
 
 Agent 读取 `/tmp/sig.json` 与 `references/rough-eval-rules.md` 后，写出 `/tmp/rough_judgment.json`，再执行：
 
 ```bash
-python3 write_candidate.py --signals /tmp/sig.json --judgment /tmp/rough_judgment.json --source "discovery:AI video" --keyword "AI coding"
+python3 write_candidate.py --from-search --signals /tmp/sig.json --judgment /tmp/rough_judgment.json --source "discovery:AI video" --keyword "AI coding"
 ```
+
+`write_candidate.py` 会强制校验 `--from-search`、`source=discovery:*` 和非空 `--keyword`。用户直接发主页URL时，即使误调用该脚本，也应失败，不允许写候选池。
 
 ### 3.1 浅判断自动推导
 
@@ -121,22 +128,29 @@ Agent 从 sig.json 的评论分析数据推导：
 
 ---
 
-## Step 4：细估（`/kol eval <URL or @handle>`，Agent + 人工）
+## Step 4：细估（`/kol <主页URL>` 或 `/kol eval <主页URL>`，Agent + 人工）
 
-**前提**：KOL 已在候选池，状态=待细估
+**前提**：用户给出 KOL 主页URL。候选池命中不是必需条件；新发现的 URL 也直接进入细估。
 
 ### 4.0 触发方式
 
 默认不再走飞书按钮 / webhook / EdgeSpark 服务触发。
 
 新的默认方式是：
-1. 人在候选池里找到 KOL，把 `对接人` 设成自己
-2. 把该行的 `主页URL` 发给自己的 agent
-3. agent 把它当作 Step 4 入口，继续完成细估并写入总表
+1. 用户把 KOL 主页URL 发给 agent
+2. agent 先运行 `check_kol_exists.py` 检查 KOL总表/平台明细和候选池
+3. 如果已在 KOL总表/正式系统中，提醒用户已存在，不继续细估
+4. 如果在候选池中，脚本把 `候选状态` 改成 `已通过`，并把候选池该行所有字段带入细估
+5. 如果 KOL总表和候选池都没有，脚本从采集信息开始，然后立刻进入细估；细估后写入 KOL总表/平台明细/评估记录，不写候选池
+
+推荐执行：
+```bash
+python3 check_kol_exists.py "<homepage_url>" --out /tmp/sig.json --meta-out /tmp/kol_lookup.json
+```
 
 ### 4.1 Agent 综合判断
 
-**输入**：`check_kol_exists.py` 产出的信号（候选池快照或重新采集）+ `references/business-standards.md`
+**输入**：`check_kol_exists.py` 产出的信号（候选池快照或重新采集）+ 候选池命中时的 `/tmp/kol_lookup.json` + `references/business-standards.md`
 
 **产出**：`/tmp/judge.json` — 包含：
 - 5 维评分（受众匹配 / 内容承载 / 流量稳定 / 互动可信 / 报价合理，各 1-10）

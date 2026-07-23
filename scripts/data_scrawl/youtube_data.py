@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """YouTube 信号采集统一入口。
 
-给定 YouTube 主页 URL 或 @handle，一次性输出 references/platform-signal-collection.csv
+给定 YouTube 主页 URL，一次性输出 references/platform-signal-collection.csv
 约定的 YouTube 信号 JSON：
 - metrics: 频道基础信息、抽样视频指标、近期 Top、月度趋势、数据来源、缺失字段
 - comments: 评论质量、评论语言分布、评论样本
@@ -10,7 +10,7 @@
 它只产出"信号"，不产出"结论"。粗估/细估由 Agent 负责。
 
 用法:
-    python3 data_scrawl/youtube_data.py @handle [--n 8] [--comment-videos 4] [--per 60]
+    python3 data_scrawl/youtube_data.py <youtube_homepage_url> [--n 8] [--comment-videos 4] [--per 60]
 """
 import argparse
 import collections
@@ -130,13 +130,11 @@ def is_throttled(stderr):
 
 def base_url(raw):
     raw = raw.strip()
-    if raw.startswith("@"):
-        raw = f"https://www.youtube.com/{raw}"
     return raw.rstrip("/")
 
 
 def fetch_about(url):
-    """从频道 /about 页读取创作者自报国家和标准 handle。"""
+    """从频道 /about 页读取创作者自报国家。"""
     try:
         req = urllib.request.Request(url + "/about", headers={
             "User-Agent": _UA,
@@ -147,11 +145,7 @@ def fetch_about(url):
     except Exception:
         return None, None
     country_match = re.search(r'"country":"([^"]+)"', html)
-    handle_match = re.search(r'"canonicalBaseUrl":"(/@[^"]+)"', html)
-    return (
-        country_match.group(1) if country_match else None,
-        handle_match.group(1).lstrip("/") if handle_match else None,
-    )
+    return country_match.group(1) if country_match else None
 
 
 def fetch_root(url):
@@ -167,8 +161,8 @@ def fetch_video_ids(url, limit):
     return [entry["id"] for entry in (payload.get("entries") or []) if entry.get("id")]
 
 
-def recent_video_ids(handle, limit):
-    url = base_url(handle)
+def recent_video_ids(channel_url, limit):
+    url = base_url(channel_url)
     if not url.endswith("/videos"):
         url += "/videos"
     stdout, code, stderr = run_ytdlp(["--flat-playlist", "--playlist-end", str(limit), "--print", "id", url], timeout=120)
@@ -281,10 +275,10 @@ def iso_to_yyyymmdd(text):
     return f"{match.group(1)}{match.group(2)}{match.group(3)}" if match else None
 
 
-def analyze_metrics(channel_url_or_handle, sample_videos):
-    url = base_url(channel_url_or_handle)
+def analyze_metrics(channel_url, sample_videos):
+    url = base_url(channel_url)
     root = fetch_root(url)
-    creator_country, canonical_handle = fetch_about(url)
+    creator_country = fetch_about(url)
 
     channel_id = root.get("channel_id")
     tikhub_channel = None
@@ -428,7 +422,6 @@ def analyze_metrics(channel_url_or_handle, sample_videos):
             "subscriber_count": subscriber_count,
             "tier": tier_label(subscriber_count),
             "creator_country": creator_country,
-            "canonical_handle": canonical_handle,
             "avatar": avatar or (tikhub_channel.get("avatar") if tikhub_channel else None),
             "email": emails[0] if emails else None,
             "category": category,
@@ -476,8 +469,8 @@ def analyze_metrics(channel_url_or_handle, sample_videos):
     }
 
 
-def analyze_comments(handle, comment_videos, per):
-    video_ids = recent_video_ids(handle, comment_videos)
+def analyze_comments(channel_url, comment_videos, per):
+    video_ids = recent_video_ids(channel_url, comment_videos)
     all_comments = []
     newest_comments = []
     per_video = []
@@ -560,7 +553,7 @@ def analyze_comments(handle, comment_videos, per):
     lang_dist = {name: f"{count / total_comments * 100:.0f}%" for name, count in lang_counts.most_common(8)}
 
     return {
-        "handle": handle,
+        "homepage_url": base_url(channel_url),
         "数据来源": "/".join(sorted(sources)) or "yt-dlp",
         "videos_sampled": len(per_video),
         "comments_sampled": total_comments,
@@ -596,8 +589,8 @@ def analyze_comments(handle, comment_videos, per):
     }
 
 
-def analyze_sponsor_intent(handle, videos=8, comment_videos=3, per=60):
-    video_ids = recent_video_ids(handle, videos)
+def analyze_sponsor_intent(channel_url, videos=8, comment_videos=3, per=60):
+    video_ids = recent_video_ids(channel_url, videos)
     business_hits = 0
     domains = collections.Counter()
     descriptions_scanned = 0
@@ -653,7 +646,7 @@ def analyze_sponsor_intent(handle, videos=8, comment_videos=3, per=60):
     intent_coverage = "可靠(英/葡/西已覆盖)" if total_comments else "n/a"
 
     return {
-        "handle": handle,
+        "homepage_url": base_url(channel_url),
         "商单": {
             "扫描视频数": descriptions_scanned,
             "含商单线索视频数": business_hits,
@@ -673,18 +666,18 @@ def analyze_sponsor_intent(handle, videos=8, comment_videos=3, per=60):
     }
 
 
-def collect(handle, sample_videos, comment_videos, per):
-    output = {"handle": handle}
+def collect(homepage_url, sample_videos, comment_videos, per):
+    output = {"homepage_url": homepage_url}
     try:
-        output["metrics"] = analyze_metrics(handle, sample_videos)
+        output["metrics"] = analyze_metrics(homepage_url, sample_videos)
     except Exception as exc:
         output["metrics"] = {"error": str(exc)}
     try:
-        output["comments"] = analyze_comments(handle, comment_videos, per)
+        output["comments"] = analyze_comments(homepage_url, comment_videos, per)
     except Exception as exc:
         output["comments"] = {"error": str(exc)}
     try:
-        output["sponsor_intent"] = analyze_sponsor_intent(handle, sample_videos, comment_videos, per)
+        output["sponsor_intent"] = analyze_sponsor_intent(homepage_url, sample_videos, comment_videos, per)
     except Exception as exc:
         output["sponsor_intent"] = {"error": str(exc)}
     return output
@@ -692,12 +685,14 @@ def collect(handle, sample_videos, comment_videos, per):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("handle")
+    parser.add_argument("homepage_url")
     parser.add_argument("--n", type=int, default=8)
     parser.add_argument("--comment-videos", type=int, default=4)
     parser.add_argument("--per", type=int, default=60)
     args = parser.parse_args()
-    print(json.dumps(collect(args.handle, args.n, args.comment_videos, args.per), ensure_ascii=False, indent=2))
+    if not args.homepage_url.startswith("http"):
+        raise SystemExit("只支持 YouTube 主页URL。")
+    print(json.dumps(collect(args.homepage_url, args.n, args.comment_videos, args.per), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

@@ -160,7 +160,7 @@ python3 scripts/write_candidate.py --signals /tmp/sig.json --judgment /tmp/rough
 
 ```
 ==================================================
-粗估: Jack Craig (@jack_craig) [YouTube]
+粗估: Jack Craig [YouTube]
 粉丝: 242,000 | ER: 3.51% | 均播放: 966,236
 评论质量: 一般 | 受众辐射: 欧美为主 | 国家: ?
 分项: {'ER': 20, '粉丝': 15, '活跃': 10, '评论': 15}
