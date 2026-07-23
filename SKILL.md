@@ -390,4 +390,4 @@ lark-cli api GET /open-apis/bitable/v1/apps/WEcDbjFnKa48YbsKa8qc8auQnlc/tables -
 | `references/methodology.md` | Full methodology: ER calc, anti-fraud tiers, pricing formula, BLUF format |
 | `references/tag-taxonomy.md` | Content tag controlled vocabulary (11 categories) |
 | `references/fraud-detection.md` | Correlation-based fraud detection method (with Python script) |
-| `references/setup-guide.md` | Environment setup and dependencies |
+| `README.md` | Environment setup, dependencies, usage, and repository overview |
