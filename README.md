@@ -1,5 +1,7 @@
 # KOL-search-eval-skill
 
+**English** | [中文](README_CN.md)
+
 KOL-search-eval-skill is a Codex skill for creator discovery, signal collection,
 rough screening, and detailed evaluation across YouTube, TikTok, Instagram, and
 Twitter/X.
