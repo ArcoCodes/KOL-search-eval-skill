@@ -1,0 +1,178 @@
+平台,JSON区块,字段路径,含义,是否供Agent粗估直接使用,备注
+YouTube,metrics.channel,metrics.channel.name,频道名称,否,主页基础信息
+YouTube,metrics.channel,metrics.channel.channel_url,主页链接,是,候选池主页URL
+YouTube,metrics.channel,metrics.channel.subscriber_count,订阅数,是,粗估粉丝维度
+YouTube,metrics.channel,metrics.channel.tier,账号量级标签,否,展示参考
+YouTube,metrics.channel,metrics.channel.creator_country,创作者自报国家,是,候选池创作者国家(自报)
+YouTube,metrics.channel,metrics.channel.canonical_handle,标准 @handle,否,仅作补充标识
+YouTube,metrics.channel,metrics.channel.email,主页简介中提取的邮箱,否,商务联络参考
+YouTube,metrics.channel,metrics.channel.category,采样视频最常见分类,否,内容定位参考
+YouTube,metrics.channel,metrics.channel.subtitle_summary,字幕语言摘要,否,内容承载参考
+YouTube,metrics.channel,metrics.channel.raw_tags_top,采样视频原始标签 Top15,否,题材映射参考
+YouTube,metrics.channel,metrics.channel.latest_upload,最近上传时间,是,粗估活跃度维度
+YouTube,metrics.channel,metrics.channel.total_views,频道总观看,否,背景参考
+YouTube,metrics.channel,metrics.channel.total_videos,长视频总数,否,背景参考
+YouTube,metrics.channel,metrics.channel.shorts_count,Shorts 数量,否,内容结构参考
+YouTube,metrics.channel,metrics.channel.avg_views_channel,频道总观看/总视频数,否,流量效率参考
+YouTube,metrics.channel,metrics.channel.description,主页简介摘要,否,内容与商务参考
+YouTube,metrics.metrics,metrics.metrics.sampled_videos,抽样视频数,否,采样覆盖度
+YouTube,metrics.metrics,metrics.metrics.avg_views_recent,抽样视频平均播放,是,候选池近期均播放
+YouTube,metrics.metrics,metrics.metrics.median_views_recent,抽样视频中位播放,否,稳定度参考
+YouTube,metrics.metrics,metrics.metrics.avg_likes_recent,抽样视频平均点赞,否,互动参考
+YouTube,metrics.metrics,metrics.metrics.avg_comments_recent,抽样视频平均评论,否,互动参考
+YouTube,metrics.metrics,metrics.metrics.engagement_rate_weighted,加权互动率((赞+评)/播放),是,粗估 ER 阈值直接使用
+YouTube,metrics.metrics,metrics.metrics.engagement_rate_simple,逐视频简单 ER 均值,否,辅助参考
+YouTube,metrics.metrics,metrics.metrics.like_rate_weighted,加权点赞率,否,细分参考
+YouTube,metrics.metrics,metrics.metrics.comment_rate_weighted,加权评论率,否,细分参考
+YouTube,metrics.metrics,metrics.metrics.view_sub_ratio,播放/订阅比,否,流量效率参考
+YouTube,metrics.metrics,metrics.metrics.upload_interval_days_avg,平均更新间隔(天),否,稳定更新参考
+YouTube,metrics.recent_top,metrics.recent_top[].title,高播放视频标题,否,内容理解
+YouTube,metrics.recent_top,metrics.recent_top[].views,高播放视频播放,否,爆款参考
+YouTube,metrics.recent_top,metrics.recent_top[].likes,高播放视频点赞,否,爆款参考
+YouTube,metrics.recent_top,metrics.recent_top[].comments,高播放视频评论,否,爆款参考
+YouTube,metrics.recent_top,metrics.recent_top[].date,高播放视频发布日期,否,人工复核
+YouTube,metrics.recent_top,metrics.recent_top[].url,高播放视频链接,否,人工复核
+YouTube,metrics.monthly_trend,metrics.monthly_trend[].month,按月聚合月份,否,近似趋势
+YouTube,metrics.monthly_trend,metrics.monthly_trend[].videos,当月采样视频数,否,近似趋势
+YouTube,metrics.monthly_trend,metrics.monthly_trend[].avg_views,当月采样平均播放,否,近似趋势
+YouTube,metrics.videos,metrics.videos[].id,抽样视频ID,否,原始明细
+YouTube,metrics.videos,metrics.videos[].title,抽样视频标题,否,原始明细
+YouTube,metrics.videos,metrics.videos[].upload_date,抽样视频上传日期,否,原始明细
+YouTube,metrics.videos,metrics.videos[].duration_sec,抽样视频时长,否,原始明细
+YouTube,metrics.videos,metrics.videos[].view_count,抽样视频播放,否,原始明细
+YouTube,metrics.videos,metrics.videos[].like_count,抽样视频点赞,否,原始明细
+YouTube,metrics.videos,metrics.videos[].comment_count,抽样视频评论,否,原始明细
+YouTube,metrics.videos,metrics.videos[].language,抽样视频语言,否,原始明细
+YouTube,metrics.videos,metrics.videos[].categories,抽样视频分类,否,原始明细
+YouTube,metrics.videos,metrics.videos[].subtitles_langs,抽样视频字幕语言,否,原始明细
+YouTube,metrics.videos,metrics.videos[].tags,抽样视频标签,否,原始明细
+YouTube,metrics.videos,metrics.videos[].description,抽样视频描述摘要,否,原始明细
+YouTube,metrics.videos,metrics.videos[].source,该视频数据来源(yt-dlp/tikhub),否,抓取来源说明
+YouTube,metrics.meta,metrics.data_source.channel,频道层数据来源,否,yt-dlp 或 tikhub
+YouTube,metrics.meta,metrics.data_source.videos,视频层数据来源,否,yt-dlp/tikhub/mixed
+YouTube,metrics.meta,metrics.missing_fields[],当前脚本拿不到的字段说明,否,提醒后续需媒体包或人工补充
+YouTube,comments.meta,comments.数据来源,评论抓取来源,否,yt-dlp 或回退来源
+YouTube,comments.meta,comments.videos_sampled,抽样评论视频数,否,采样覆盖度
+YouTube,comments.meta,comments.comments_sampled,抽样评论总数,否,采样覆盖度
+YouTube,comments.per_video,comments.per_video[].id,评论抽样视频ID,否,说明评论来自哪条视频
+YouTube,comments.per_video,comments.per_video[].title,评论抽样视频标题,否,人工复核
+YouTube,comments.per_video,comments.per_video[].views,评论抽样视频播放,否,人工复核
+YouTube,comments.per_video,comments.per_video[].likes,评论抽样视频点赞,否,人工复核
+YouTube,comments.per_video,comments.per_video[].comment_count,评论抽样视频总评论数,否,人工复核
+YouTube,comments.per_video,comments.per_video[].sampled,该视频实际抓取评论数,否,采样覆盖度
+YouTube,comments.signals,comments.signals.泛泛灌水占比,泛泛夸赞型评论占比,是,评论质量判断核心输入
+YouTube,comments.signals,comments.signals.模板化重复评论占比,模板化重复评论占比,是,评论质量判断核心输入
+YouTube,comments.signals,comments.signals.重复评论样例,重复评论样例文本,否,人工复核
+YouTube,comments.signals,comments.signals.召唤抽奖类,抽奖/召唤式评论数,否,作弊/活动信号
+YouTube,comments.signals,comments.signals.平均评论长度(字符),评论平均长度,否,真实性参考
+YouTube,comments.signals,comments.signals.多emoji评论占比,多表情评论占比,否,真实性参考
+YouTube,comments.signals,comments.signals.频道主回复数,频道主回复数,否,经营活跃度参考
+YouTube,comments.signals,comments.signals.0赞评论占比,零赞评论占比,否,互动质量参考
+YouTube,comments.signals,comments.signals.疑问句占比(软),疑问句占比,否,软信号
+YouTube,comments.signals,comments.signals.含表情占比(软),含表情评论占比,否,软信号
+YouTube,comments.signals,comments.signals.含时间戳占比(软),含时间戳评论占比,否,软信号
+YouTube,comments.signals,comments.signals.纯陈述句占比(软),纯陈述句占比,否,软信号
+YouTube,comments.signals,comments.signals.真实观众行为提示,真实观众行为提示语,否,软信号总结
+YouTube,comments.signals,comments.signals.不同作者/总数,不同作者数/评论总数,否,去重与真实性参考
+YouTube,comments.signals,comments.signals.作者重复Top,重复出现最多的作者,否,可疑互动参考
+YouTube,comments.signals,comments.signals.非拉丁脚本命中(地域线索),脚本命中分布,否,地域线索
+YouTube,comments.signals,comments.signals.评论语言分布(估算),评论语言分布估算,是,推导受众辐射
+YouTube,comments.signals,comments.signals.纯拉丁文评论数,纯拉丁文评论数,否,语言结构参考
+YouTube,comments.sample,comments.sample[].author,评论样本作者,否,人工复核
+YouTube,comments.sample,comments.sample[].likes,评论样本点赞数,否,人工复核
+YouTube,comments.sample,comments.sample[].text,评论样本文本,否,人工复核
+YouTube,sponsor_intent.商单,sponsor_intent.商单.扫描视频数,扫描的视频描述数,否,采样覆盖度
+YouTube,sponsor_intent.商单,sponsor_intent.商单.含商单线索视频数,含商单线索的视频数,否,商业化成熟度参考
+YouTube,sponsor_intent.商单,sponsor_intent.商单.描述域名Top,视频描述中的域名 Top,否,品牌/联盟链接线索
+YouTube,sponsor_intent.商单,sponsor_intent.商单.明细[].title,视频标题,否,人工复核
+YouTube,sponsor_intent.商单,sponsor_intent.商单.明细[].hits,命中的商单线索标签,否,如折扣码/赞助/affiliate
+YouTube,sponsor_intent.购买意图,sponsor_intent.购买意图.扫描评论数,扫描评论数,否,采样覆盖度
+YouTube,sponsor_intent.购买意图,sponsor_intent.购买意图.命中数,购买意图评论命中数,否,商业价值参考
+YouTube,sponsor_intent.购买意图,sponsor_intent.购买意图.占比,购买意图评论占比,否,商业价值参考
+YouTube,sponsor_intent.购买意图,sponsor_intent.购买意图.评论语言提示,购买意图评论的语言提示,否,解释可靠性
+YouTube,sponsor_intent.购买意图,sponsor_intent.购买意图.意图正则覆盖,规则覆盖说明,否,解释可靠性
+YouTube,sponsor_intent.购买意图,sponsor_intent.购买意图.样本,购买意图评论样本,否,人工复核
+TikTok,channel,channel.name,创作者昵称,否,主页基础信息
+TikTok,channel,channel.unique_id,主页 handle,是,用于展示与兜底定位
+TikTok,channel,channel.sec_uid,TikTok 内部 sec_uid,否,用于二次采集
+TikTok,channel,channel.channel_url,主页链接,是,候选池主页URL
+TikTok,channel,channel.followers,粉丝数,是,粗估粉丝维度
+TikTok,channel,channel.total_likes,账号累计获赞,否,背景参考
+TikTok,channel,channel.video_count,作品数,否,背景参考
+TikTok,channel,channel.verified,是否认证,否,背景参考
+TikTok,channel,channel.region,创作者自报地区,是,映射创作者国家(自报)
+TikTok,channel,channel.signature,主页简介,否,细估参考
+TikTok,channel,channel.avatar,头像链接,否,展示字段
+TikTok,metrics,metrics.sampled_videos,抽样视频数,否,采样覆盖度
+TikTok,metrics,metrics.avg_play,抽样视频平均播放,是,候选池近期均播放
+TikTok,metrics,metrics.median_play,抽样视频中位播放,否,稳定度参考
+TikTok,metrics,metrics.engagement_rate_weighted,加权互动率,是,粗估 ER 阈值直接使用
+TikTok,metrics,metrics.like_rate_weighted,加权点赞率,否,细分参考
+TikTok,metrics,metrics.comment_rate_weighted,加权评论率,否,细分参考
+TikTok,metrics,metrics.share_rate_weighted,加权分享率,否,细分参考
+TikTok,metrics,metrics.play_follower_ratio,播放/粉丝比,否,流量效率参考
+TikTok,recent_top,recent_top[].desc,高播放作品描述,否,内容理解
+TikTok,recent_top,recent_top[].play,高播放作品播放,否,爆款参考
+TikTok,recent_top,recent_top[].digg,高播放作品点赞,否,爆款参考
+TikTok,recent_top,recent_top[].comment,高播放作品评论,否,爆款参考
+TikTok,recent_top,recent_top[].share,高播放作品分享,否,爆款参考
+TikTok,recent_top,recent_top[].url,高播放作品链接,否,人工复核
+TikTok,comment_signals,comment_signals.sampled_video,评论抽样视频ID,否,说明评论来自哪条视频
+TikTok,comment_signals,comment_signals.n_comments,抽样评论数,否,采样覆盖度
+TikTok,comment_signals,comment_signals.language_dist,评论语言分布,是,推导受众辐射
+TikTok,comment_signals,comment_signals.purchase_intent_count,高购买意图评论数,否,商业价值参考
+TikTok,comment_signals,comment_signals.duplicate_comments,重复评论数,是,辅助评论质量判断
+TikTok,comment_signals,comment_signals.samples[].text,评论样本正文,否,人工复核
+TikTok,comment_signals,comment_signals.samples[].lang,评论样本语言,否,人工复核
+TikTok,comment_signals,comment_signals.samples[].buy,评论样本是否高购买意图,否,人工复核
+TikTok,meta,missing_fields[],当前脚本拿不到的字段说明,否,提醒后续需媒体包或人工补充
+Instagram,channel,channel.name,创作者昵称,否,主页基础信息
+Instagram,channel,channel.unique_id,主页 username,是,用于展示与兜底定位
+Instagram,channel,channel.user_id,Instagram 内部 user_id,否,用于二次采集
+Instagram,channel,channel.channel_url,主页链接,是,候选池主页URL
+Instagram,channel,channel.followers,粉丝数,是,粗估粉丝维度
+Instagram,channel,channel.following,关注数,否,背景参考
+Instagram,channel,channel.post_count,帖子数,否,背景参考
+Instagram,channel,channel.verified,是否认证,否,背景参考
+Instagram,channel,channel.is_business,是否企业账号,否,商务成熟度参考
+Instagram,channel,channel.category,账号分类,否,内容定位参考
+Instagram,channel,channel.biography,主页简介,否,细估参考
+Instagram,channel,channel.external_url,外链,否,商务能力参考
+Instagram,channel,channel.avatar,头像链接,否,展示字段
+Instagram,metrics,metrics.sampled_posts,抽样帖子数,否,采样覆盖度
+Instagram,metrics,metrics.avg_likes,抽样帖子平均点赞,否,流量参考
+Instagram,metrics,metrics.avg_comments,抽样帖子平均评论,否,互动参考
+Instagram,metrics,metrics.engagement_rate_weighted,加权互动率((赞+评)/粉丝),是,粗估 ER 阈值直接使用
+Instagram,recent_top,recent_top[].desc,高点赞帖子描述,否,内容理解
+Instagram,recent_top,recent_top[].like,高点赞帖子点赞,否,爆款参考
+Instagram,recent_top,recent_top[].comment,高点赞帖子评论,否,爆款参考
+Instagram,recent_top,recent_top[].play,高点赞帖子播放,否,仅部分 Reels 可得
+Instagram,recent_top,recent_top[].url,高点赞帖子链接,否,人工复核
+Instagram,comment_signals,comment_signals,当前为空对象,否,现阶段未抓评论层信号
+Instagram,meta,missing_fields[],当前脚本拿不到的字段说明,否,提醒后续需媒体包或人工补充
+Twitter/X,channel,channel.name,创作者昵称,否,主页基础信息
+Twitter/X,channel,channel.unique_id,主页 screen_name,是,用于展示与兜底定位
+Twitter/X,channel,channel.rest_id,Twitter 内部 rest_id,否,用于二次采集
+Twitter/X,channel,channel.channel_url,主页链接,是,候选池主页URL
+Twitter/X,channel,channel.followers,粉丝数,是,粗估粉丝维度
+Twitter/X,channel,channel.following,关注数,否,背景参考
+Twitter/X,channel,channel.blue_verified,是否蓝V,否,背景参考
+Twitter/X,channel,channel.verification_type,认证类型,否,背景参考
+Twitter/X,channel,channel.location,主页地点,是,映射创作者国家(自报)
+Twitter/X,channel,channel.website,主页外链,否,商务成熟度参考
+Twitter/X,channel,channel.biography,主页简介,否,细估参考
+Twitter/X,channel,channel.avatar,头像链接,否,展示字段
+Twitter/X,metrics,metrics.sampled_tweets,抽样推文数,否,采样覆盖度
+Twitter/X,metrics,metrics.avg_views,抽样推文平均浏览,是,候选池近期均播放
+Twitter/X,metrics,metrics.engagement_rate_weighted,加权互动率((赞+转+回+引)/views),是,粗估 ER 阈值直接使用
+Twitter/X,metrics,metrics.like_rate_weighted,加权点赞率,否,细分参考
+Twitter/X,metrics,metrics.retweet_rate_weighted,加权转推率,否,细分参考
+Twitter/X,metrics,metrics.reply_rate_weighted,加权回复率,否,细分参考
+Twitter/X,metrics,metrics.bookmark_rate_weighted,加权收藏率,否,强意图参考
+Twitter/X,recent_top,recent_top[].text,高浏览推文文本,否,内容理解
+Twitter/X,recent_top,recent_top[].views,高浏览推文浏览,否,爆款参考
+Twitter/X,recent_top,recent_top[].fav,高浏览推文点赞,否,爆款参考
+Twitter/X,recent_top,recent_top[].rt,高浏览推文转推,否,爆款参考
+Twitter/X,recent_top,recent_top[].url,高浏览推文链接,否,人工复核
+Twitter/X,comment_signals,comment_signals.language_dist,推文语言分布,是,推导受众辐射
+Twitter/X,meta,missing_fields[],当前脚本拿不到的字段说明,否,提醒后续需媒体包或人工补充
