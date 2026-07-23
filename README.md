@@ -18,7 +18,7 @@ pricing heuristics, and Feishu/Bitable writeback.
 - Run rough screening for fraud, activity, engagement, and audience fit.
 - Write qualified or rejected creators into a Feishu candidate pool.
 - Reuse candidate-pool snapshots for detailed evaluation.
-- Write detailed evaluation records, KOL hub rows, and optional Feishu IM notices.
+- Write detailed evaluation records and KOL hub rows.
 
 ## Workflow
 
@@ -55,7 +55,6 @@ handoff entry and does not create a candidate-pool row.
 | `scripts/write_candidate.py` | Candidate-pool writeback after rough screening |
 | `scripts/check_kol_exists.py` | Existing KOL/candidate lookup before detailed evaluation |
 | `scripts/write_kol.py` | Detailed evaluation writeback |
-| `scripts/feishu_notify.py` | Optional Feishu IM notification |
 | `references/` | Evaluation rules, methodology, schema notes, tag taxonomy, anti-fraud references |
 | `docs/kol-reports/` | Example KOL reports |
 
@@ -69,14 +68,30 @@ handoff entry and does not create a candidate-pool row.
 | requests | `pip3 install requests` | HTTP requests used by scripts |
 | yt-dlp Python module | `pip3 install yt-dlp` | Optional Python import path for some collection flows |
 
+## Feishu First-Time Login
+
+After installing `lark-cli`, you need to complete Feishu OAuth authorization on first use:
+
+```bash
+lark-cli auth login --domain base
+```
+
+The terminal will display a verification URL. Open it in your browser and authorize with your Feishu account. `lark-cli` ships with a built-in shared app — you do not need to create your own Feishu app.
+
+After login, verify access to the KOL Bitable:
+
+```bash
+lark-cli api GET /open-apis/bitable/v1/apps/WEcDbjFnKa48YbsKa8qc8auQnlc/tables --jq '.data.total'
+```
+
+If you get a permission error, ask the Bitable owner to add you as a collaborator.
+
 ## Configuration
 
 Create `scripts/.env`:
 
 ```dotenv
 TIKHUB_API_KEY=your_api_key_here
-FEISHU_APP_ID=cli_xxxxxxxxxx
-FEISHU_APP_SECRET=xxxxxxxxxx
 ```
 
 Environment variables can also be exported directly in your shell. The scripts
@@ -85,8 +100,6 @@ first read the shell environment, then fall back to `scripts/.env`.
 | Variable | Required For | Notes |
 |----------|--------------|-------|
 | `TIKHUB_API_KEY` | TikTok, Instagram, Twitter/X, and YouTube fallback | YouTube uses yt-dlp first; TikHub is used when yt-dlp is rate-limited or for non-YouTube platforms |
-| `FEISHU_APP_ID` | Feishu IM notification and app-token flows | Required by `scripts/feishu_notify.py` |
-| `FEISHU_APP_SECRET` | Feishu IM notification and app-token flows | Required by `scripts/feishu_notify.py` |
 
 Do not commit `scripts/.env` or any other `.env` file. This repository's
 `.gitignore` excludes environment files by default.
@@ -117,8 +130,6 @@ command -v lark-cli && echo "lark-cli OK"
 python3 -c "import requests; print('requests OK')"
 python3 -c "import yt_dlp; print('yt_dlp module OK')"
 grep -q TIKHUB_API_KEY scripts/.env && echo "TIKHUB_API_KEY configured"
-grep -q FEISHU_APP_ID scripts/.env && echo "FEISHU_APP_ID configured"
-grep -q FEISHU_APP_SECRET scripts/.env && echo "FEISHU_APP_SECRET configured"
 ```
 
 Script import smoke test:
@@ -140,7 +151,7 @@ lark-cli api GET /open-apis/bitable/v1/apps/WEcDbjFnKa48YbsKa8qc8auQnlc/tables -
 - `yt-dlp` fails: update with `brew upgrade yt-dlp`. YouTube changes frequently.
 - YouTube asks for sign-in or bot verification: pause heavy comment scraping, or
   use `yt-dlp --cookies-from-browser chrome` when appropriate.
-- `lark-cli` auth expires: re-run `lark-cli` and refresh credentials.
+- `lark-cli` auth expires: run `lark-cli auth login --domain base` to re-authorize.
 - TikHub returns 403: check API key validity and account balance in the TikHub
   dashboard.
 - TikTok, Instagram, or Twitter/X collection fails immediately: confirm

@@ -270,7 +270,7 @@ def main():
     ap.add_argument("--report-dir", default="docs/kol-reports")
     ap.add_argument("--no-write", action="store_true", help="只出报告，不写飞书")
     ap.add_argument("--parent", help="层级认人：把本平台账号挂到该 KOL总表主体 record_id（同一个人的另一平台号）")
-    ap.add_argument("--by", help="对接人(email/open_id)：写入 KOL 总表 + 细估完发飞书通知")
+    ap.add_argument("--by", help="对接人(email/open_id)：写入 KOL 总表对接人")
     a = ap.parse_args()
     sig = json.load(open(a.signals, encoding="utf-8"))
     j = json.load(open(a.judgment, encoding="utf-8"))
@@ -325,25 +325,6 @@ def main():
         r2 = lark(["+record-batch-create", "--base-token", BT, "--table-id", EVAL,
                    "--json", json.dumps({"fields": ef, "rows": [er]}, ensure_ascii=False)])
         print(f"判断卡: {r2.get('ok')} {(r2.get('data') or {}).get('record_id_list')}")
-
-    # 飞书通知对接人
-    if not a.no_write and a.by:
-        try:
-            import feishu_notify as fn
-            token = fn.get_tenant_token()
-            open_id, id_type = fn.resolve_open_id(token, a.by)
-            sc = j.get("scores", {})
-            card = fn.build_eval_card(
-                title=f"KOL 细估完成: {name}",
-                kol_name=name, homepage_url=homepage_url, platform=platform,
-                business=j.get("业务线", ""),
-                scores=sc, verdict=j.get("综合判断", ""),
-                price_range=j.get("合理报价区间USD", ""),
-                conclusion=j.get("判断依据", ""),
-            )
-            fn.send_card(token, open_id, id_type, card)
-        except Exception as e:
-            print(f"⚠️ 飞书通知失败: {e}", file=sys.stderr)
 
     # 报告
     rpt = render_report(sig, j, ch, mt, homepage_url, today)
