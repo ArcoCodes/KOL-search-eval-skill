@@ -396,7 +396,7 @@ def render_report(sig, j, ch, mt, homepage_url, today):
     L.append(f"| 分(/10) | {sc.get('受众匹配')} | {sc.get('内容承载')} | {sc.get('流量稳定')} | {sc.get('互动可信')} | {sc.get('报价合理')} |\n")
     L.append(f"- **业务线**：{j.get('业务线')}　**受众欧美辐射**：{j.get('受众欧美辐射')}（{j.get('推断受众地区','')}）")
     L.append(f"- **报价区间**：{j.get('合理报价区间USD','')}（{j.get('计价口径','')}）")
-    L.append(f"- **创作者国家(自报)**：{ch.get('creator_country')}\n\n---\n")
+    L.append(f"- **创作者国家(自报)**：{ch.get('creator_country') or '—'}\n\n---\n")
     yt = platform == "YouTube"
     L.append("## 1. 基础信息")
     base = "订阅" if yt else "粉丝"
@@ -412,12 +412,14 @@ def render_report(sig, j, ch, mt, homepage_url, today):
         L.append(f"| {_c(v['views'])} | {v.get('date','')} | [{t}]({v.get('url','')}) |")
     L.append(f"\n> 近期均{metric_col} {_c(mt.get('avg_views_recent'))}。\n")
     L.append("## 3. 互动质量")
+    def _pct(v):
+        return f"{v*100:.2f}%" if isinstance(v, (int, float)) else (v or "?")
     extra_rate = ""
     if mt.get("share_rate_weighted"):
-        extra_rate = f" / {'转发率' if platform=='TikTok' else '转推率'} {mt.get('share_rate_weighted')}"
+        extra_rate = f" / {'转发率' if platform=='TikTok' else '转推率'} {_pct(mt.get('share_rate_weighted'))}"
     base_label = {"YouTube": "播放/订阅", "TikTok": "播放/粉丝"}.get(platform, "")
     ratio = f"｜ {base_label} {mt.get('view_sub_ratio')}" if base_label and mt.get('view_sub_ratio') else ""
-    L.append(f"- 加权 ER **{mt.get('engagement_rate_weighted')}**（赞率 {mt.get('like_rate_weighted')} / 评论率 {mt.get('comment_rate_weighted')}{extra_rate}）{ratio}\n")
+    L.append(f"- 加权 ER **{_pct(mt.get('engagement_rate_weighted'))}**（赞率 {_pct(mt.get('like_rate_weighted'))} / 评论率 {_pct(mt.get('comment_rate_weighted'))}{extra_rate}）{ratio}\n")
     L.append("## 4. 评论真实性")
     if platform == "TikTok":
         L.append(f"- 抽样 {csig.get('n_comments','?')} 条 ｜ 语言分布 {csig.get('language_dist')} ｜ 购买意图(原生标记) {csig.get('purchase_intent_count')} ｜ 重复 {csig.get('duplicate_comments')}")
@@ -427,7 +429,9 @@ def render_report(sig, j, ch, mt, homepage_url, today):
         L.append(f"- {'推文' if platform=='Twitter' else '评论'}语言分布：{ld or '—'} ｜ 评论质量标记：{j.get('评论质量标记')}\n")
     else:
         L.append(f"- 泛灌 {cmt.get('泛泛灌水占比')} ｜ 模板重复 {cmt.get('模板化重复评论占比')} ｜ 0赞 {cmt.get('0赞评论占比')} ｜ 真实观众行为：{cmt.get('真实观众行为提示')}")
-        L.append(f"- 评论语言：{cmt.get('评论语言分布(估算)')} ｜ 评论质量标记：{j.get('评论质量标记')}\n")
+        lang_dist = cmt.get('评论语言分布(估算)')
+        lang_str = " / ".join(f"{k} {v}" for k, v in lang_dist.items()) if isinstance(lang_dist, dict) else (lang_dist or '—')
+        L.append(f"- 评论语言：{lang_str} ｜ 评论质量标记：{j.get('评论质量标记')}\n")
     L.append("## 5. 判断依据")
     L.append(fmt_basis(j.get("判断依据", "")) + "\n")
     L.append("## 6. 未获取字段")

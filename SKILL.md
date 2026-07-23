@@ -53,7 +53,7 @@ Parse the skill args to determine the entry point:
 |---------|----------|---------------|
 | `youtube.com`| YouTube | `data_scrawl/youtube_data.py` |
 | `instagram.com` | Instagram | `data_scrawl/instagram_data.py` |
-| `tiktok.com` | TikTok | ``data_scrawl/tiktok_data.py`` |
+| `tiktok.com` | TikTok | `data_scrawl/tiktok_data.py` |
 | `twitter.com`, `x.com` | Twitter/X | `data_scrawl/twitter_data.py` |
 
 **FORBIDDEN:** Playwright / HTTP raw requests / generic scrapers for social platform data. All data acquisition goes through the scripts above (yt-dlp + TikHub).
@@ -98,7 +98,7 @@ Required JSON:
   "粗估得分": 85,
   "评论质量标记": "真实讨论",
   "受众辐射(推断)": "欧美为主",
-  "粗估依据": "硬分85/100(ER30+粉丝15+活跃10+评论30); 评论有具体产品问题讨论; 内容与业务线相关",
+  "粗估依据": "85/100 (ER=30 + 粉丝=15 + 活跃=20 + 评论=20); 受众以欧美为主(评论语言85%英语); 内容围绕AI视频生成/图像编辑，与Renoise场景高度相关; 近8条视频均播放1.2万，5万订阅下ER 5.2%属健康区间; 评论有具体产品使用讨论，未见明显灌水; 风险: 更新频率偏低(月均2条)",
   "淘汰原因": "",
   "业务线": "Renoise"
 }
@@ -116,29 +116,21 @@ write_candidate.py writes: 候选池 only. It does not compute scores or make de
 
 `write_candidate.py` has a hard guard: it only accepts search-discovered KOLs with `--from-search --source "discovery:<keywords>" --keyword "<keywords>"`. If the user directly provided a homepage URL, do not call this script.
 
-**粗估依据**必须写具体内容（Agent 手写硬分明细 + 关键判断）。格式:
+**粗估依据**必须写具体内容，示例:
 ```
-硬分85/100(ER30+粉丝15+活跃10+评论30); 受众辐射: 欧美为主; 内容与 Renoise 的 AI 视频创作场景相关
+85/100 (ER=30 + 粉丝=15 + 活跃=20 + 评论=20); 受众以欧美为主(评论语言85%英语); 内容围绕AI视频生成/图像编辑，与Renoise场景高度相关; 近8条视频均播放1.2万，5万订阅下ER 5.2%属健康区间; 评论有具体产品使用讨论，未见明显灌水; 风险: 更新频率偏低(月均2条)
 ```
-**禁止**写"各项指标达标"这种空话。至少要包含硬分明细；如有明显风险，也应写入粗估依据。
+**禁止**写"各项指标达标"这种空话。要包含各维度得分拆解、受众语言/地区判断、内容相关性、关键数据及风险点。
 
-### Output format
+### 粗估输出
 
-```
-==================================================
-粗估: Channel Name [YouTube]
-粉丝: 50,000 | ER: 5.20% | 均播放: 12,000
-评论质量: 真实讨论 | 受众辐射: 欧美为主 | 国家: US
-硬分: {'ER': 30, '粉丝': 15, '活跃': 20, '评论': 30} = 95/100
-最终: ✓ 待细估 / ✗ 已淘汰(浅筛)
-==================================================
-```
+Agent 用自然语言向用户汇报粗估结论，不要求固定格式。内容应涵盖：KOL 名称、平台、关键数据（粉丝数/ER/均播放）、评论质量判断、受众判断、最终结论（待细估/已淘汰）及主要理由。用对方能直接理解的话说清楚，避免堆砌缩写和内部术语。
 
 ---
 
 ## Detailed Eval (`/kol eval <URL> [--by email/open_id]`)
 
-**Step 4: Agent根据KOL链接及已采集的信号进行细估.**
+**Step 4: Agent根据KOL链接及已采集的信号进行细估**
 
 ### When to use
 - Whenever the user provides a KOL homepage URL
@@ -182,20 +174,43 @@ If the user provided any homepage URL, treat it as a detailed-eval entry point, 
 
 Read the signal JSON + comment samples. Cross-reference `${CLAUDE_SKILL_DIR}/references/business-standards.md` to produce a judgment JSON with:
 
-**5-Dimension Scoring** (each 1-10):
-- 受众匹配 (Audience Match)
-- 内容承载 (Content Capacity)
-- 流量稳定 (Traffic Stability)
-- 互动可信 (Engagement Credibility)
-- 报价合理 (Pricing Reasonableness)
+**judge.json 完整 schema**（`write_kol.py` 按此读取，缺字段会导致报告/落库缺项）：
 
-**Classification Fields:**
-- **综合判断**: `建议合作` / `观望` / `放弃`
-- **业务线**: `Bloome` / `Renoise`
+```json
+{
+  "业务线": "Bloome | Renoise",
+  "受众欧美辐射": "欧美为主 | 日本为主 | 巴西/葡语拉美为主 | 分散无主导 | 非欧美为主 | 未知/待核实",
+  "推断受众地区": "自然语言描述，如'英语国家为主(评论100%英语)'",
+  "评论质量标记": "真实讨论 | 一般 | 严重灌水/疑似养号",
+  "内容语言": "en / zh / ja / ...",
+  "题材_LLM": "Agent 对频道题材的英文概括",
+  "调性_LLM": "Agent 对频道调性的概括",
+  "内容题材": ["多选，如 AI编程·开发、AI视频"],
+  "提及工具": ["多选，如 Claude Code、Runway"],
+  "scores": {
+    "受众匹配": "1-10",
+    "内容承载": "1-10",
+    "流量稳定": "1-10",
+    "互动可信": "1-10",
+    "报价合理": "1-10"
+  },
+  "综合判断": "建议合作 | 观望 | 放弃",
+  "判断依据": "完整判断理由，含各维度关键论据",
+  "一句话": "一句话结论，用于报告摘要",
+  "有效播放": "中位播放数(数字)",
+  "合理报价区间USD": "如 flat/USD 1,000-2,000",
+  "计价口径": "报价推算依据说明",
+  "状态": "未合作",
+  "备注": "可选",
+  "频道评估": "一句话摘要，写法参考 detailed-eval-rules.md 第一维度",
+  "受众结构": "一句话摘要，写法参考 detailed-eval-rules.md 第二维度",
+  "流量稳定性": "一句话摘要，写法参考 detailed-eval-rules.md 第三维度",
+  "互动真实性": "一句话摘要，写法参考 detailed-eval-rules.md 第四维度",
+  "内容匹配度": "一句话摘要，写法参考 detailed-eval-rules.md 第五维度"
+}
+```
 
-**Required Outputs:**
-- 合理报价区间 (USD, must include numbers) + 计价口径
-- 一句话结论 + 判断依据
+**注意**：`scores` 里的 5 个数字评分写入评估记录表，底部 5 个文本摘要（频道评估/受众结构/流量稳定性/互动真实性/内容匹配度）写入 KOL 总表，两者必须都填。单选字段值必须严格匹配上述枚举，否则飞书整条静默写入失败。
 
 Write the judgment JSON to `/tmp/judge.json`.
 
@@ -220,21 +235,9 @@ Then aggregate to KOL Hub table:
 cd ${CLAUDE_SKILL_DIR}/scripts && python3 sync_hub.py
 ```
 
-### Report Output
+### 细估输出
 
-```
-=== KOL Evaluation Complete ===
-KOL: <name>
-Homepage URL: <homepage_url>
-Platform: <platform>
-Audience: <受众欧美辐射>
-Scores: 受众匹配 X / 内容承载 X / 流量稳定 X / 互动可信 X / 报价合理 X
-Verdict: <综合判断>
-Price Range: USD X,XXX – X,XXX (<计价口径>)
-Conclusion: <一句话结论>
-对接人: <email/open_id> (如传 --by 则已通知)
-Feishu: <record link>
-```
+Agent 用自然语言向用户汇报细估结论，不要求固定格式。内容应涵盖：KOL 名称、平台、五维评分、综合判断（建议合作/观望/放弃）、合理报价区间、一句话结论、对接人及飞书记录链接。
 
 **Currency format:** Use `USD X,XXX` — never `$X,XXX` (IM renderers eat the `$`).
 
@@ -306,43 +309,24 @@ KOL总表 (Hub, one person one row, tblEylVlrP1Qtrmb)
 - Multi-select fields do NOT auto-create options — fetch existing options → union → write back
 - Dedup key: YouTube = `channel_id`, TikTok = `sec_uid`; always check before writing
 - `综合判断` only accepts `建议合作`/`观望`/`放弃` — wrong value = silent failure
-- `候选状态` 只接受: `待细估`/`已通过`/`已淘汰`/ `已完成`
+- `候选状态` 只接受: `待细估`/`已通过`/`已淘汰`/`已完成`
 - `粗估依据` 禁止写空泛内容如"各项指标达标"。格式: `XX/100(ER分+粉丝分+活跃分+评论分); 关键风险: <具体结论>`
 - Link field format: `[{"id":"rec..."}]`
 
 ---
 
-## Candidate Pool Handoff (细估触发)
-
-
-### 候选池表必要字段
+## 候选池字段说明
 
 | 字段 | 类型 | 用途 |
 |------|------|------|
-| 候选状态 | 单选 | 待细估 / 已通过 / 已淘汰  / 已完成 |
+| 候选状态 | 单选 | 待细估/已通过/已淘汰/已完成 |
 | 对接人 | 人员 | 谁负责跟进这个 KOL |
 | 粗估得分 | 数字 | Agent 按 rough-eval-rules.md 给出的粗估分 |
-| 粗估依据 | 文本 | 硬分明细 + 关键风险标记 |
+| 粗估依据 | 文本 | 打分明细 + 关键风险标记 |
 | 主页URL | URL | 细估默认入口；人发给 agent 的就是这个 |
 | 平台内ID | 文本 | 候选池内去重和兜底定位 |
 | 业务线 | 多选 | Bloome/Renoise/EdgeSpark |
 | 采集信号JSON | 长文本 | 可选；若字段存在，write_candidate.py 会写入信号快照供 Step 4 复用 |
-
-### 人的操作
-
-1. 如果目标 KOL 来自候选池，把 `对接人` 设成自己
-2. 把该行 `主页URL` 发给自己的 agent
-3. 不需要额外说明它来自候选池；agent 会先查候选池和 KOL 总表
-
-### Agent 的操作
-
-1. 把所有主页 URL 视为 Step 4 入口，而不是 Step 2+3 的粗估入口
-2. 先运行 `check_kol_exists.py` 做系统查重和信号准备
-3. 如果候选池命中，脚本已把该记录 `候选状态` 改成 `已通过`；读取 `/tmp/kol_lookup.json` 里的完整候选池字段，拿到 `业务线` 和 `对接人`
-4. 读取 `sig.json`（候选池快照或重新采集）
-5. 产出 `/tmp/judge.json`
-6. 执行 `write_kol.py --by <对接人email/open_id>`，把结果写入平台明细 / 评估记录 / KOL 总表
-7. 最后执行 `sync_hub.py`
 
 ---
 
