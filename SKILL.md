@@ -3,7 +3,7 @@ name: kol searching&eval
 description: >
   Use this skill for KOL/creator discovery and evaluation across YouTube, TikTok,
   Instagram, and Twitter/X. Trigger when the user wants to search creators by keyword,
-  evaluate a channel/account/homepage URL.
+  evaluate a channel/account/homepage URL, or check/update this skill's GitHub version.
 allowed-tools: Bash, Read, Write
 ---
 
@@ -41,10 +41,11 @@ Parse the skill args to determine the entry point:
 
 1. `search` → KOL search + optional signal collection + Agent rough screening (see Search section)
 2. `eval` → detailed evaluation for candidates (accepts candidate-pool URL; see Detailed Eval section)
-3. `check` → environment check (see Check section)
-4. URL or `@handle` → signal collection + Agent rough screening (see Screen section)
+3. `check update` / `update` / `更新 skill` → read `references/update.md` and follow the explicit update protocol
+4. `check` → environment check (see Check section)
+5. URL or `@handle` → signal collection + Agent rough screening (see Screen section)
    - Exception: if the user explicitly says this URL/handle comes from 候选池 or asks for "细估", route to Detailed Eval instead of rough screening.
-5. Otherwise → show usage help
+6. Otherwise → show usage help
 
 ## Platform Detection
 
@@ -382,6 +383,12 @@ Also verify Feishu access:
 lark-cli api GET /open-apis/bitable/v1/apps/WEcDbjFnKa48YbsKa8qc8auQnlc/tables --jq '.data.total'
 ```
 
+## Update (`/kol check update` or `/kol update`)
+
+Do not check for updates during normal KOL workflows. Only when the user
+explicitly asks to check or install updates, read `references/update.md` and
+follow that protocol.
+
 ## Reference Documents
 
 | File | Purpose |
@@ -390,4 +397,5 @@ lark-cli api GET /open-apis/bitable/v1/apps/WEcDbjFnKa48YbsKa8qc8auQnlc/tables -
 | `references/methodology.md` | Full methodology: ER calc, anti-fraud tiers, pricing formula, BLUF format |
 | `references/tag-taxonomy.md` | Content tag controlled vocabulary (11 categories) |
 | `references/fraud-detection.md` | Correlation-based fraud detection method (with Python script) |
+| `references/update.md` | Manual check/update protocol for GitHub-distributed skill versions |
 | `README.md` | Environment setup, dependencies, usage, and repository overview |
