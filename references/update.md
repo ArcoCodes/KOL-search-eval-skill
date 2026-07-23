@@ -1,8 +1,6 @@
 # Skill Update Protocol
 
-This skill does **not** check GitHub for updates automatically. Only run update
-checks when the user explicitly asks for `check update`, `检查更新`, `更新 skill`,
-or equivalent wording.
+This skill runs update checks when the user explicitly asks for `check update`, `检查更新kol评估skill`, `更新 kol评估skill`, or equivalent wording.
 
 ## Goals
 
