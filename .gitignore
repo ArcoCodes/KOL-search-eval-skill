@@ -4,4 +4,6 @@
 __pycache__/
 *.py[cod]
 .claude/settings.local.json
+test.md
+refactor_plan.md
 
