@@ -56,7 +56,7 @@ tblfBV6INxVDVl6X                   tblEylVlrP1Qtrmb
 | 12 | `互动真实性` | text | — | 评估维度：互动是否真实、有无刷量 |
 | 13 | `流量稳定性` | text | — | 评估维度：播放量/流量是否稳定 |
 | 14 | `频道评估` | text | — | 评估维度：频道整体质量评价 |
-| 15 | `情况说明(上一版，现已拆分为右边5列维度)` | text | — | 旧版综合说明（已拆分为上述 5 个维度） |
+| 15 | `情况说明(旧版，现已拆分为右边5列维度)` | text | — | 旧版综合说明（已拆分为上述 5 个维度） |
 | 16 | `YouTube账号` | link（双向） | → YouTube KOL（`tblzR7h4fH1y1Hkf`） | 关联的 YouTube 账号记录 |
 | 17 | `TikTok账号` | link（双向） | → TikTok KOL（`tblsUnmLnBVfXpEg`） | 关联的 TikTok 账号记录 |
 | 18 | `Instagram账号` | link（双向） | → Instagram KOL（`tblV1DXvLLoci6ZM`） | 关联的 Instagram 账号记录 |
