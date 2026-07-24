@@ -1,215 +1,291 @@
-# Candidate Pool DB Schema
+# KOL 数据库 Schema
 
-> Source of truth: `lark-cli base +field-list --base-token WEcDbjFnKa48YbsKa8qc8auQnlc --table-id tblfBV6INxVDVl6X --as user`
+> 数据来源：`lark-cli base +field-list --base-token WEcDbjFnKa48YbsKa8qc8auQnlc --as user`
 >
-> Read on: 2026-07-23
-> Table: 候选池 (`tblfBV6INxVDVl6X`)
-> Note: Account-name fields are not part of the live candidate-pool workflow; homepage URL is the canonical entry.
+> 读取时间：2026-07-24
+> 多维表格共 18 张表，本文档记录与 KOL 评估 skill 直接相关的 6 张表。
 
-## Summary
+---
 
-- Total fields: `22`
-- Current table role: Step 3 rough-screening workbench + Step 4 human handoff entry
-- Important mismatch with current docs/code:
-  - `业务线` only has `Bloome` / `Renoise`; `EdgeSpark` is missing
-  - There is no `采集信号JSON` / `信号JSON` / `信号快照JSON` field in the live table yet, so `write_candidate.py` cannot currently persist the full signal snapshot
+## 表间关系
 
-## Live Field Schema
+```
+KOL 候选池                          KOL 总表
+tblfBV6INxVDVl6X                   tblEylVlrP1Qtrmb
+┌──────────────┐                   ┌──────────────────┐
+│ 关联主体 ─────── link(单向) ──────▶│  主体名称         │
+│              │                   │                  │
+│  （粗筛工作台）│                   │  YouTube账号 ◀───── 双向link ────▶ YouTube KOL
+│              │                   │  TikTok账号  ◀───── 双向link ────▶ TikTok KOL
+│              │                   │  Instagram账号◀───── 双向link ────▶ Instagram KOL
+│              │                   │  Twitter账号 ◀───── 双向link ────▶ Twitter KOL
+│              │                   │                  │
+│              │                   │  合作批次    ◀───── 双向link ────▶ 合作批次表
+│              │                   │  合作上线记录 ◀───── 双向link ────▶ KOL 上线表
+│              │                   │  评估卡      ◀───── 双向link ────▶ 评估记录表
+└──────────────┘                   └──────────────────┘
+```
 
-| # | Field | Type | Options / Link | Notes |
+**核心逻辑**：
+- **KOL 总表** 是主体级别的中心表，一个 KOL 主体可关联多个平台账号
+- **分平台表**（YouTube / TikTok / Instagram / Twitter）存储各平台的账号级详细数据，通过 `所属KOL` 双向关联回总表
+- **候选池** 是粗筛工作台，通过 `关联主体` 单向关联到总表（粗筛通过后创建主体记录并回链）
+
+---
+
+## 1. KOL 总表
+
+> 表名：KOL 总表（含评估维度，分合作周期管理）
+> table_id：`tblEylVlrP1Qtrmb`
+> 字段数：24
+> 角色：KOL 主体级中心表，汇聚评估维度、合作进度、多平台账号关联
+
+| # | 字段 | 类型 | 选项 / 关联 | 说明 |
 |---|---|---|---|---|
-| 1 | `关联主体` | `link` | link → `tblEylVlrP1Qtrmb` | Linked KOL hub record |
-| 2 | `近期均播放` | `number` | precision `0`, thousands separator | Recent average views / plays |
-| 3 | `评论质量标记` | `select` | `真实讨论` / `一般` / `严重灌水/疑似养号` | Rough-screen derived |
-| 4 | `创作者国家(自报)` | `text` | - | Description says this is self-reported / platform-exposed only |
-| 5 | `账号名称` | `text` | - | Creator display name |
-| 6 | `命中关键词` | `text` | - | Search/discovery hit keyword |
-| 7 | `受众辐射(推断)` | `select` | `欧美为主` / `日本为主` / `巴西/葡语拉美为主` / `分散无主导` / `非欧美为主` / `未知/待核实` | Rough inference from comments/language |
-| 8 | `主页URL` | `text(url)` | - | Current Step 4 canonical entry |
-| 9 | `发现时间` | `datetime` | format `yyyy-MM-dd HH:mm` | Discovery timestamp |
-| 10 | `业务线` | `select` | `Bloome` / `Renoise` | Missing `EdgeSpark` |
-| 11 | `粗估依据` | `text` | - | Basis text shown to humans |
-| 12 | `平台内ID` | `text` | - | Platform-level dedupe / fallback locator |
-| 13 | `粗估得分` | `number` | precision `1` | Rough score `0-100` |
-| 14 | `淘汰原因` | `text` | - | Elimination reason |
-| 15 | `粉丝数` | `number` | precision `0`, thousands separator | Follower count |
-| 16 | `来源记录ID` | `text` | - | Legacy logical back-reference |
-| 17 | `来源` | `text` | - | Discovery source label |
-| 18 | `加权ER` | `number` | precision `2` | Stored as numeric percent-style value, not Feishu percentage formatting |
-| 19 | `平台` | `select` | `YouTube` / `TikTok` / `Instagram` / `Twitter` | Platform routing |
-| 20 | `来源表` | `text` | - | Legacy logical back-reference |
-| 21 | `对接人` | `user` | single user | Human owner for Step 4 |
-| 22 | `候选状态` | `select` | `待细估` / `细估中` / `已通过` / `已淘汰` / `建联中` / `待深筛` / `已淘汰(浅筛)` | Main workflow state |
+| 1 | `主体名称` | text | — | KOL 主体标识名 |
+| 2 | `平台` | select（多选） | `YouTube` / `TikTok` / `Instagram` / `Twitter` / `Github` | 该 KOL 活跃的平台 |
+| 3 | `业务线` | select（多选） | `Bloome` / `Renoise` | — |
+| 4 | `对接人` | user（单选） | — | 人工负责人 |
+| 5 | `合作进度` | select | `待联系` / `建联中` / `砍价中` / `报价审批` / `成交（待沟通制作）` / `脚本审核` / `制作中` / `视频草稿审核` / `已上线` / `流失` / `搁置` / `次日复盘` / `d7复盘` / `d30复盘` | 主工作流状态 |
+| 6 | `综合判断` | select | `建议合作` / `观望` / `放弃` | 评估结论 |
+| 7 | `状态更新时间` | datetime | 格式 `yyyy-MM-dd HH:mm` | 合作进度最后变更时间 |
+| 8 | `统一邮箱` | text | — | KOL 联系邮箱 |
+| 9 | `Agent建议报价` | text | — | Agent 生成的报价建议 |
+| 10 | `内容匹配度` | text | — | 评估维度：内容与产品的匹配程度 |
+| 11 | `受众结构` | text | — | 评估维度：受众画像与目标市场的吻合度 |
+| 12 | `互动真实性` | text | — | 评估维度：互动是否真实、有无刷量 |
+| 13 | `流量稳定性` | text | — | 评估维度：播放量/流量是否稳定 |
+| 14 | `频道评估` | text | — | 评估维度：频道整体质量评价 |
+| 15 | `情况说明(上一版，现已拆分为右边5列维度)` | text | — | 旧版综合说明（已拆分为上述 5 个维度） |
+| 16 | `YouTube账号` | link（双向） | → YouTube KOL（`tblzR7h4fH1y1Hkf`） | 关联的 YouTube 账号记录 |
+| 17 | `TikTok账号` | link（双向） | → TikTok KOL（`tblsUnmLnBVfXpEg`） | 关联的 TikTok 账号记录 |
+| 18 | `Instagram账号` | link（双向） | → Instagram KOL（`tblV1DXvLLoci6ZM`） | 关联的 Instagram 账号记录 |
+| 19 | `Twitter账号` | link（双向） | → Twitter KOL（`tbltybPG07lSIuqM`） | 关联的 Twitter 账号记录 |
+| 20 | `合作批次` | link（双向） | → 合作批次（`tblqZBeOlkxpYkd1`） | 关联的合作批次 |
+| 21 | `合作上线记录` | link（双向） | → KOL 上线表（`tblc2wO1HV7S3bUJ`） | 关联的上线视频记录 |
+| 22 | `评估卡` | link（双向） | → 评估记录（`tblA1p25lxwHnsuV`） | 关联的评估卡 |
+| 23 | `累计订单` | formula | 从上线表汇总 | 该 KOL 所有合作的累计订单数 |
+| 24 | `累计引流` | formula | 从上线表汇总 | 该 KOL 所有合作的累计引流量 |
 
-## What The Current Table Already Covers Well
+---
 
-- Human handoff essentials are already present:
-  - `主页URL`
-  - `对接人`
-  - `候选状态`
-  - `业务线`
-- Rough screening essentials are already present:
-  - `粉丝数`
-  - `加权ER`
-  - `近期均播放`
-  - `评论质量标记`
-  - `受众辐射(推断)`
-  - `粗估得分`
-  - `粗估依据`
-- System linkage essentials are partially present:
-  - `平台`
-  - `平台内ID`
-  - `关联主体`
+## 2. 分平台数据表
 
-## Gaps To Fix First
+四张分平台表结构相似，均通过 `所属KOL` 双向关联回总表。下面分别列出。
 
-These are the highest-priority schema gaps relative to the current skill/process design.
+### 2.1 YouTube KOL
 
-### 1. Add full signal snapshot field
+> table_id：`tblzR7h4fH1y1Hkf`
+> 字段数：32
+> 关联字段：`所属KOL` ↔ 总表 `YouTube账号`
 
-Recommended field:
+| # | 字段 | 类型 | 说明 |
+|---|---|---|---|
+| 1 | `所属KOL` | link（双向） | 关联总表 |
+| 2 | `账号名称` | text | 频道名称 |
+| 3 | `主页URL` | text | 频道主页 |
+| 4 | `邮箱` | text(email) | 联系邮箱 |
+| 5 | `创作者国家(自报)` | text | /about 页自报国家 |
+| 6 | `YouTube分类` | text | YouTube 平台分类 |
+| 7 | `内容语言` | text | 内容语言 |
+| 8 | `粉丝数` | number | — |
+| 9 | `视频总数` | number | — |
+| 10 | `近期均播放` | number（千分位） | — |
+| 11 | `中位播放` | number（千分位） | — |
+| 12 | `互动率` | number（%） | (赞+评)/播放 均值 |
+| 13 | `更新间隔` | number | 发布频率（天） |
+| 14 | `最近更新日期` | datetime | 格式 `yyyy-MM-dd` |
+| 15 | `推断受众地区` | text | 评论/语言采样推断 |
+| 16 | `受众真实数据(KOL提供)` | text | KOL 后台导出的真实受众数据 |
+| 17 | `受众欧美辐射(推断)` | select | `欧美为主` / `分散无主导` / `非欧美为主` / `未知/待核实` / `日本为主` / `巴西/葡语拉美为主` |
+| 18 | `评论质量标记` | select | `真实讨论` / `一般` / `严重灌水/疑似养号` |
+| 19 | `内容题材` | select（多选） | 多种题材标签（50+选项） |
+| 20 | `题材_LLM` | text | LLM 总结的题材方向 |
+| 21 | `调性_LLM` | text | LLM 总结的内容调性 |
+| 22 | `提及工具` | select（多选） | Seedance / Runway / Kling 等（50+选项） |
+| 23 | `原始标签` | text | YouTube 原始 tags 留存 |
+| 24 | `粗估状态` | select | `通过` / `淘汰` / `待评` |
+| 25 | `粗估淘汰原因` | text | — |
+| 26 | `博主报价USD` | number | 博主报价 |
+| 27 | `成交价USD` | number | 最终成交价 |
+| 28 | `建议报价USD` | text | Agent 建议报价 |
+| 29 | `合作建议` | text | — |
+| 30 | `来源` | text | 搜索关键词 / 批次 |
+| 31 | `抓取时间` | datetime | 格式 `yyyy-MM-dd HH:mm` |
+| 32 | `备注` | text | — |
 
-| Field | Type | Why |
-|---|---|---|
-| `采集信号JSON` | long text | Let `write_candidate.py` persist the full Step 2 signal package so Step 4 can reuse it without refetching |
+### 2.2 TikTok KOL
 
-This is the biggest missing piece right now, because the code already supports it if the field exists.
+> table_id：`tblsUnmLnBVfXpEg`
+> 字段数：28
+> 关联字段：`所属KOL` ↔ 总表 `TikTok账号`
 
-### 2. Add signal freshness metadata
+| # | 字段 | 类型 | 说明 |
+|---|---|---|---|
+| 1 | `所属KOL` | link（双向） | 关联总表 |
+| 2 | `账号名称` | text | — |
+| 3 | `@handle` | text | TikTok 用户名 |
+| 4 | `主页URL` | text | — |
+| 5 | `sec_uid` | text | TikTok 平台内 ID |
+| 6 | `头像URL` | text | — |
+| 7 | `签名` | text | 个人简介 |
+| 8 | `创作者国家(自报)` | text | — |
+| 9 | `粉丝数` | number | — |
+| 10 | `视频数` | number | — |
+| 11 | `近期均播放` | number | — |
+| 12 | `中位播放` | number | — |
+| 13 | `播放粉丝比` | number | 播放/粉丝 |
+| 14 | `加权ER` | number（%） | — |
+| 15 | `赞率` | number（%） | — |
+| 16 | `评论率` | number（%） | — |
+| 17 | `转发率` | number（%） | — |
+| 18 | `总赞` | number | — |
+| 19 | `购买意图数` | number | 高购买意图评论数 |
+| 20 | `评论语言分布` | text | — |
+| 21 | `评论质量标记` | select | `真实讨论` / `一般` / `严重灌水/疑似养号` |
+| 22 | `内容题材` | select（多选） | `AI工具·资讯` 等 |
+| 23 | `粗估状态` | select | `通过` / `淘汰` / `待评` |
+| 24 | `粗估淘汰原因` | text | — |
+| 25 | `提及工具` | select（多选） | （选项待补充） |
+| 26 | `来源` | text | — |
+| 27 | `抓取时间` | datetime | 格式 `yyyy-MM-dd HH:mm` |
+| 28 | `备注` | text | — |
 
-Recommended fields:
+### 2.3 Instagram KOL
 
-| Field | Type | Why |
-|---|---|---|
-| `信号采集时间` | datetime | Know when the snapshot was collected |
-| `信号来源脚本` | text | e.g. `data_scrawl/youtube_data.py`, `tiktok.py`, `instagram.py`, `twitter.py` |
-| `采样窗口` | text | e.g. `recent 8 videos`, `recent 12 posts`, `recent 20 tweets` |
+> table_id：`tblV1DXvLLoci6ZM`
+> 字段数：25
+> 关联字段：`所属KOL` ↔ 总表 `Instagram账号`
 
-Without this, people and agents cannot judge whether a snapshot is stale or comparable.
+| # | 字段 | 类型 | 说明 |
+|---|---|---|---|
+| 1 | `所属KOL` | link（双向） | 关联总表 |
+| 2 | `账号名称` | text | — |
+| 3 | `@handle` | text | Instagram 用户名 |
+| 4 | `用户ID` | text | 平台内 ID |
+| 5 | `主页URL` | text | — |
+| 6 | `头像URL` | text | — |
+| 7 | `简介` | text | 个人简介 |
+| 8 | `外链` | text | 个人主页外链 |
+| 9 | `创作者国家(自报)` | text | — |
+| 10 | `是否商业号` | checkbox | — |
+| 11 | `分类` | text | 平台分类 |
+| 12 | `粉丝数` | number | — |
+| 13 | `关注数` | number | — |
+| 14 | `帖子数` | number | — |
+| 15 | `互动率` | number（%） | — |
+| 16 | `近期均赞` | number | — |
+| 17 | `近期均评` | number | — |
+| 18 | `评论质量标记` | select | `真实讨论` / `一般` / `严重灌水/疑似养号` |
+| 19 | `内容题材` | select（多选） | 多种题材标签 |
+| 20 | `提及工具` | select（多选） | Claude Code / Runway / Seedance 等 |
+| 21 | `粗估状态` | select | `通过` / `淘汰` / `待评` |
+| 22 | `粗估淘汰原因` | text | — |
+| 23 | `来源` | text | — |
+| 24 | `抓取时间` | datetime | 格式 `yyyy-MM-dd HH:mm` |
+| 25 | `备注` | text | — |
 
-### 3. Add business-useful summary fields instead of dumping everything into text
+### 2.4 Twitter KOL
 
-Recommended fields:
+> table_id：`tbltybPG07lSIuqM`
+> 字段数：27
+> 关联字段：`所属KOL` ↔ 总表 `Twitter账号`
 
-| Field | Type | Why |
-|---|---|---|
-| `内容赛道` | multi-select or text | Quick routing by niche/topic |
-| `内容摘要` | text | One-line what this creator actually posts |
-| `代表作摘要` | text | Short summary of the top recent post/video/tweet |
-| `商业化信号` | select | `强` / `中` / `弱` / `未知`; helps prioritize leads |
+| # | 字段 | 类型 | 说明 |
+|---|---|---|---|
+| 1 | `所属KOL` | link（双向） | 关联总表 |
+| 2 | `账号名称` | text | — |
+| 3 | `@handle` | text | Twitter 用户名 |
+| 4 | `rest_id` | text | Twitter 平台内 ID |
+| 5 | `主页URL` | text | — |
+| 6 | `头像URL` | text | — |
+| 7 | `简介` | text | 个人简介 |
+| 8 | `外链` | text | 个人主页外链 |
+| 9 | `创作者国家(自报)` | text | — |
+| 10 | `蓝V` | checkbox | 是否蓝标认证 |
+| 11 | `认证类型` | text | 认证类型描述 |
+| 12 | `粉丝数` | number | — |
+| 13 | `关注数` | number | — |
+| 14 | `近期均views` | number | 近期推文平均浏览量 |
+| 15 | `加权ER` | number（%） | — |
+| 16 | `点赞率` | number（%） | — |
+| 17 | `转推率` | number（%） | — |
+| 18 | `回复率` | number（%） | — |
+| 19 | `收藏率` | number（%） | — |
+| 20 | `评论质量标记` | select | `真实讨论` / `一般` / `严重灌水/疑似养号` |
+| 21 | `内容题材` | select（多选） | 多种题材标签（50+选项） |
+| 22 | `提及工具` | select（多选） | Claude Code / Seedance / Cursor 等（50+选项） |
+| 23 | `粗估状态` | select | `通过` / `淘汰` / `待评` |
+| 24 | `粗估淘汰原因` | text | — |
+| 25 | `来源` | text | — |
+| 26 | `抓取时间` | datetime | 格式 `yyyy-MM-dd HH:mm` |
+| 27 | `备注` | text | — |
 
-The candidate pool is a workbench, so a few readable summary fields will be more useful than forcing humans to open raw JSON every time.
+---
 
-### 4. Add review-operation metadata
+## 3. KOL 候选池
 
-Recommended fields:
+> table_id：`tblfBV6INxVDVl6X`
+> 字段数：21
+> 角色：粗筛工作台，候选人入池 → 粗估/细估 → 通过后进入总表
 
-| Field | Type | Why |
-|---|---|---|
-| `分配时间` | datetime | When the owner took it |
-| `最后处理时间` | datetime | Last workflow touch |
-| `细估完成时间` | datetime | Completion timestamp |
-| `最后操作Agent` | text | Which agent/script last touched the row |
+| # | 字段 | 类型 | 选项 / 关联 | 说明 |
+|---|---|---|---|---|
+| 1 | `关联主体` | link（单向） | → KOL 总表（`tblEylVlrP1Qtrmb`） | 粗筛通过后关联到已创建的主体记录 |
+| 2 | `账号名称` | text | — | 创作者显示名称 |
+| 3 | `平台` | select | `YouTube` / `TikTok` / `Instagram` / `Twitter` | 平台路由 |
+| 4 | `主页URL` | text(url) | — | 规范入口，交接唯一标识 |
+| 5 | `业务线` | select | `Bloome` / `Renoise` | — |
+| 6 | `对接人` | user（单选） | — | 人工负责人 |
+| 7 | `候选状态` | select | `待粗估` / `待细估` / `已细估进入总表` / `已淘汰` | 主工作流状态 |
+| 8 | `粗估得分` | number（精度 1） | — | 综合分 0-100 |
+| 9 | `粗估依据` | text | — | 粗估理由，展示给人工 |
+| 10 | `淘汰原因` | text | — | — |
+| 11 | `粉丝数` | number（千分位） | — | — |
+| 12 | `加权ER` | number（精度 2） | — | 存储为数值型百分比值 |
+| 13 | `近期均播放` | number（千分位） | — | — |
+| 14 | `评论质量标记` | select | `真实讨论` / `一般` / `严重灌水/疑似养号` | — |
+| 15 | `受众辐射(推断)` | select | `欧美为主` / `日本为主` / `巴西/葡语拉美为主` / `分散无主导` / `非欧美为主` / `未知/待核实` | 评论/语言推断 |
+| 16 | `创作者国家(自报)` | text | — | 自报国家 |
+| 17 | `命中关键词` | text | — | 搜索/召回命中的关键词 |
+| 18 | `来源` | text | — | 发现来源标签 |
+| 19 | `来源记录ID` | text | — | 历史反向引用 |
+| 20 | `来源表` | text | — | 历史反向引用 |
+| 21 | `发现时间` | datetime | 格式 `yyyy-MM-dd HH:mm` | 发现时间戳 |
 
-These make the candidate pool easier to manage operationally once many people are using their own agents.
+---
 
-## Recommended Additional Fields By Priority
+## 分平台表共有字段对照
 
-## P0: Should add now
+四张分平台表有大量相同语义的字段，以下是对照：
 
-| Field | Type | Reason |
-|---|---|---|
-| `采集信号JSON` | long text | Required for signal reuse and consistency with current code |
-| `信号采集时间` | datetime | Prevent stale-signal reuse |
-| `内容摘要` | text | Makes the pool readable without reopening raw signals |
-| `代表作摘要` | text | Gives humans quick context when assigning |
+| 语义 | YouTube | TikTok | Instagram | Twitter |
+|---|---|---|---|---|
+| 关联总表 | `所属KOL` | `所属KOL` | `所属KOL` | `所属KOL` |
+| 账号名 | `账号名称` | `账号名称` | `账号名称` | `账号名称` |
+| 用户名 | — | `@handle` | `@handle` | `@handle` |
+| 平台内ID | — | `sec_uid` | `用户ID` | `rest_id` |
+| 主页 | `主页URL` | `主页URL` | `主页URL` | `主页URL` |
+| 粉丝数 | `粉丝数` | `粉丝数` | `粉丝数` | `粉丝数` |
+| 播放/浏览 | `近期均播放` | `近期均播放` | — | `近期均views` |
+| 互动率 | `互动率` | `加权ER` | `互动率` | `加权ER` |
+| 评论质量 | `评论质量标记` | `评论质量标记` | `评论质量标记` | `评论质量标记` |
+| 内容题材 | `内容题材` | `内容题材` | `内容题材` | `内容题材` |
+| 提及工具 | `提及工具` | `提及工具` | `提及工具` | `提及工具` |
+| 粗估状态 | `粗估状态` | `粗估状态` | `粗估状态` | `粗估状态` |
+| 创作者国家 | `创作者国家(自报)` | `创作者国家(自报)` | `创作者国家(自报)` | `创作者国家(自报)` |
+| 来源 | `来源` | `来源` | `来源` | `来源` |
+| 抓取时间 | `抓取时间` | `抓取时间` | `抓取时间` | `抓取时间` |
+| 备注 | `备注` | `备注` | `备注` | `备注` |
 
-## P1: Strongly recommended
+---
 
-| Field | Type | Reason |
-|---|---|---|
-| `内容赛道` | multi-select | Better filtering and assignment |
-| `商业化信号` | select | Useful because TikTok/YouTube comment and sponsor signals already exist |
-| `评论语言Top1` | text | Handy surfaced summary from existing signal package |
-| `评论语言Top2` | text | Same |
-| `重复评论风险` | select | `低` / `中` / `高`; easier than reading raw numbers |
-| `最近活跃时间` | datetime or text | Important for triage and freshness |
+## 已知问题
 
-## P2: Nice to have
+### 候选池 `候选状态` 字段描述过时
 
-| Field | Type | Reason |
-|---|---|---|
-| `采样覆盖度` | text | e.g. `8 videos / 30 comments`, useful for confidence |
-| `高购买意图评论数` | number | Especially useful for TikTok / YouTube business value |
-| `信号完整度` | select | `完整` / `部分缺失` / `需重采` |
-| `细估入口备注` | text | Freeform note from human to agent |
+字段描述中提及 `待初筛` / `已封杀-印度` / `已封杀-养号` / `已初筛入库` 等值，但实际选项已更新为 `待粗估` / `待细估` / `已细估进入总表` / `已淘汰`。需清理描述文本。
 
-## Fields That Should Probably Be Removed Or Reworked
+### 候选池 `平台内ID` 字段已被移除
 
-| Field | Suggestion | Why |
-|---|---|---|
-| `来源表` | Re-evaluate | Step 3 no longer writes platform detail tables, so this is less meaningful now |
-| `来源记录ID` | Re-evaluate | Same as above; may be legacy from old write-first design |
-
-## Enum / Workflow Fixes Needed
-
-### `业务线`
-
-Current live options:
-
-- `Bloome`
-- `Renoise`
-
-Should be aligned to the skill/process docs:
-
-- `Bloome`
-- `Renoise`
-- `EdgeSpark`
-
-### `候选状态`
-
-Current options are workable, but the field description is stale and mentions values not actually present, such as:
-
-- `待初筛`
-- `已封杀-印度`
-- `已封杀-养号`
-- `已初筛入库`
-
-Recommendation:
-
-- Either add those states back intentionally
-- Or update the field description to match the actual workflow states only
-
-## Suggested Minimal Candidate Pool Shape
-
-If the goal is to keep the pool light but still useful, the recommended minimum set is:
-
-- `账号名称`
-- `平台`
-- `主页URL`
-- `平台内ID`
-- `业务线`
-- `对接人`
-- `候选状态`
-- `发现时间`
-- `粉丝数`
-- `加权ER`
-- `近期均播放`
-- `评论质量标记`
-- `受众辐射(推断)`
-- `粗估得分`
-- `粗估依据`
-- `内容摘要`
-- `代表作摘要`
-- `采集信号JSON`
-- `信号采集时间`
-- `关联主体`
-
-## Suggested Next Actions
-
-1. Keep homepage URL as the only handoff identifier
-1. Add `EdgeSpark` to `业务线`
-2. Add `采集信号JSON`
-3. Add `信号采集时间`
-4. Add `内容摘要` and `代表作摘要`
-5. Clean up stale description text on `候选状态`
+旧版存在的 `平台内ID` 字段在当前线上表中已不存在，去重和定位需依赖 `主页URL`。
